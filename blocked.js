@@ -1,6 +1,8 @@
 const params = new URLSearchParams(window.location.search);
 const site = params.get("site") || "this site";
 const reason = params.get("reason") || "blocked";
+const tabIdParam = params.get("tabId");
+const tabId = tabIdParam ? Number(tabIdParam) : null;
 
 // Stoic-inspired reflections, paraphrased in plain language rather than
 // quoted from any historical text. Each one leans on a different Stoic
@@ -171,14 +173,24 @@ function setupRestraintChallenge(site, rawType, sec, destUrl) {
     continueBtn.disabled = true;
     continueBtn.textContent = "Opening website...";
 
+    let currentTabId = tabId;
+    if (!currentTabId && typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.getCurrent) {
+      try {
+        const t = await chrome.tabs.getCurrent();
+        if (t?.id) currentTabId = t.id;
+      } catch {
+        /* ignore */
+      }
+    }
+
     try {
       if (typeof grantRestraintPass === "function") {
-        await grantRestraintPass(site, 15);
+        await grantRestraintPass(site, 15, currentTabId);
       }
       if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
         await new Promise((resolve) => {
           chrome.runtime.sendMessage(
-            { type: "GRANT_RESTRAINT_PASS", domain: site, durationMinutes: 15 },
+            { type: "GRANT_RESTRAINT_PASS", domain: site, durationMinutes: 15, tabId: currentTabId },
             () => {
               if (chrome.runtime.lastError) {
                 /* ignore if background worker is inactive */

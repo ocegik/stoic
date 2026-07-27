@@ -186,7 +186,7 @@ async function tick() {
   if (entry.mode === "block") {
     tripReason = "blocked";
   } else if (entry.mode === "restraint") {
-    const hasPass = await hasActiveRestraintPass(key);
+    const hasPass = await hasActiveRestraintPass(key, current.tabId);
     if (!hasPass) {
       tripReason = "restraint";
     } else {
@@ -232,7 +232,8 @@ let latestYouTubeMetadataByTab = {};
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GRANT_RESTRAINT_PASS") {
-    grantRestraintPass(message.domain, message.durationMinutes || 15)
+    const tabId = message.tabId || sender.tab?.id;
+    grantRestraintPass(message.domain, message.durationMinutes || 15, tabId)
       .then((pass) => {
         runTick();
         sendResponse({ success: true, pass });
@@ -355,6 +356,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.tabs.onActivated.addListener(() => runTick());
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.url) runTick();
+});
+chrome.tabs.onRemoved.addListener((tabId) => {
+  removeRestraintPassForTab(tabId);
 });
 chrome.windows.onFocusChanged.addListener(() => runTick());
 
