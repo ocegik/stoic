@@ -9,6 +9,7 @@ const {
   grantRestraintPass,
   hasActiveRestraintPass,
   saveRestraintPasses,
+  normalizeDomain,
 } = require("../common.js");
 
 test("generateMathPuzzle: generates valid single-digit arithmetic puzzle and correct answer", () => {
@@ -62,6 +63,16 @@ test("getActiveRule: returns restraint configuration properties", () => {
   assert.equal(rule.countdownSeconds, 20);
 });
 
+test("normalizeDomain: normalizes URLs, schemes, www, subdomains, ports, and paths", () => {
+  assert.equal(normalizeDomain("youtube.com"), "youtube.com");
+  assert.equal(normalizeDomain("www.youtube.com"), "youtube.com");
+  assert.equal(normalizeDomain("https://www.youtube.com/watch?v=123"), "youtube.com");
+  assert.equal(normalizeDomain("http://m.youtube.com:8080/feed?g=1#hash"), "m.youtube.com");
+  assert.equal(normalizeDomain("  REDDIT.COM/r/stoicism/ "), "reddit.com");
+  assert.equal(normalizeDomain(""), "");
+  assert.equal(normalizeDomain(null), "");
+});
+
 test("Restraint Pass Lifecycle: grantRestraintPass & hasActiveRestraintPass", async () => {
   await saveRestraintPasses({});
 
@@ -72,11 +83,33 @@ test("Restraint Pass Lifecycle: grantRestraintPass & hasActiveRestraintPass", as
   await grantRestraintPass(domain, 15);
   assert.equal(await hasActiveRestraintPass(domain), true);
 
+  // Check multiple times — pass must NOT be consumed or invalidated on first check
+  assert.equal(await hasActiveRestraintPass(domain), true);
+  assert.equal(await hasActiveRestraintPass(domain), true);
+
   // Expired pass check
   await saveRestraintPasses({
     [domain]: { grantedAt: Date.now() - 3600000, expiresAt: Date.now() - 1000 },
   });
   assert.equal(await hasActiveRestraintPass(domain), false);
+});
+
+test("Restraint Pass Domain Matching: handles www, subdomains, protocols, and trailing slashes", async () => {
+  await saveRestraintPasses({});
+
+  // 1. Grant pass for www.youtube.com -> covers youtube.com, www.youtube.com, subdomains, and full URLs
+  await grantRestraintPass("www.youtube.com", 15);
+  assert.equal(await hasActiveRestraintPass("youtube.com"), true);
+  assert.equal(await hasActiveRestraintPass("www.youtube.com"), true);
+  assert.equal(await hasActiveRestraintPass("m.youtube.com"), true);
+  assert.equal(await hasActiveRestraintPass("https://www.youtube.com/watch?v=abc"), true);
+
+  await saveRestraintPasses({});
+
+  // 2. Grant pass for bare domain reddit.com -> covers old.reddit.com and full post URL
+  await grantRestraintPass("reddit.com", 15);
+  assert.equal(await hasActiveRestraintPass("old.reddit.com"), true);
+  assert.equal(await hasActiveRestraintPass("https://old.reddit.com/r/stoicism/comments/1"), true);
 });
 
 test("REFLECTION_QUESTIONS: provides a non-empty collection of mindful reflection prompts", () => {

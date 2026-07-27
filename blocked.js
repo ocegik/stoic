@@ -168,13 +168,30 @@ function setupRestraintChallenge(site, rawType, sec, destUrl) {
 
   continueBtn.addEventListener("click", async () => {
     if (continueBtn.disabled) return;
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      try {
-        await chrome.runtime.sendMessage({ type: "GRANT_RESTRAINT_PASS", domain: site, durationMinutes: 15 });
-      } catch {
-        /* ignore */
+    continueBtn.disabled = true;
+    continueBtn.textContent = "Opening website...";
+
+    try {
+      if (typeof grantRestraintPass === "function") {
+        await grantRestraintPass(site, 15);
       }
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        await new Promise((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "GRANT_RESTRAINT_PASS", domain: site, durationMinutes: 15 },
+            () => {
+              if (chrome.runtime.lastError) {
+                /* ignore if background worker is inactive */
+              }
+              resolve();
+            }
+          );
+        });
+      }
+    } catch (err) {
+      console.error("[Stoic] Error granting restraint pass:", err);
     }
+
     window.location.href = destUrl || `https://${site}`;
   });
 

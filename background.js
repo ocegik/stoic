@@ -231,6 +231,16 @@ async function tick() {
 let latestYouTubeMetadataByTab = {};
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "GRANT_RESTRAINT_PASS") {
+    grantRestraintPass(message.domain, message.durationMinutes || 15)
+      .then((pass) => {
+        runTick();
+        sendResponse({ success: true, pass });
+      })
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (message.type === "YOUTUBE_METADATA_UPDATE") {
     const tabId = sender.tab?.id || activeState.tabId;
     if (tabId && message.metadata) {

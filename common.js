@@ -267,6 +267,24 @@ function resolveRestraintType(configuredType) {
 const RESTRAINT_PASSES_KEY = "restraint_passes";
 let inMemoryRestraintPasses = {};
 
+function normalizeDomain(domain) {
+  if (!domain || typeof domain !== "string") return "";
+  let d = domain.trim().toLowerCase();
+  if (/^https?:\/\//i.test(d)) {
+    try {
+      const u = new URL(d);
+      d = u.hostname;
+    } catch {
+      d = d.replace(/^https?:\/\//i, "").split("/")[0];
+    }
+  } else {
+    d = d.split("/")[0].split("?")[0].split("#")[0];
+  }
+  d = d.split(":")[0];
+  d = d.replace(/^www\./i, "");
+  return d;
+}
+
 async function getRestraintPasses() {
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     const { [RESTRAINT_PASSES_KEY]: passes = {} } = await chrome.storage.local.get(RESTRAINT_PASSES_KEY);
@@ -283,26 +301,61 @@ async function saveRestraintPasses(passes) {
   }
 }
 
+if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && Object.prototype.hasOwnProperty.call(changes, RESTRAINT_PASSES_KEY)) {
+      inMemoryRestraintPasses = changes[RESTRAINT_PASSES_KEY].newValue || {};
+    }
+  });
+}
+
 async function grantRestraintPass(domain, durationMinutes = 15) {
-  if (!domain) return null;
+  const cleanDomain = normalizeDomain(domain);
+  if (!cleanDomain) return null;
   const passes = await getRestraintPasses();
   const expiresAt = Date.now() + (durationMinutes * 60 * 1000);
-  passes[domain] = { grantedAt: Date.now(), expiresAt };
+  passes[cleanDomain] = { grantedAt: Date.now(), expiresAt };
   await saveRestraintPasses(passes);
-  return passes[domain];
+  return passes[cleanDomain];
 }
 
 async function hasActiveRestraintPass(domain) {
-  if (!domain) return false;
+  const cleanDomain = normalizeDomain(domain);
+  if (!cleanDomain) return false;
   const passes = await getRestraintPasses();
-  const pass = passes[domain];
-  if (!pass) return false;
-  if (Date.now() > pass.expiresAt) {
-    delete passes[domain];
-    await saveRestraintPasses(passes);
-    return false;
+  const now = Date.now();
+
+  let hasExpired = false;
+  for (const passKey of Object.keys(passes)) {
+    if (passes[passKey] && now > passes[passKey].expiresAt) {
+      delete passes[passKey];
+      hasExpired = true;
+    }
   }
-  return true;
+  if (hasExpired) {
+    await saveRestraintPasses(passes);
+  }
+
+  // Exact match
+  if (passes[cleanDomain] && now <= passes[cleanDomain].expiresAt) {
+    return true;
+  }
+
+  // Parent / subdomain matching
+  for (const passKey of Object.keys(passes)) {
+    const cleanPassKey = normalizeDomain(passKey);
+    if (passes[passKey] && now <= passes[passKey].expiresAt) {
+      if (
+        cleanDomain === cleanPassKey ||
+        cleanDomain.endsWith("." + cleanPassKey) ||
+        cleanPassKey.endsWith("." + cleanDomain)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function getActiveRule(entry, date = new Date()) {
@@ -2035,6 +2088,7 @@ const api = {
   saveRestraintPasses,
   grantRestraintPass,
   hasActiveRestraintPass,
+  normalizeDomain,
   getThemePreference,
   setThemePreference,
   applyTheme,
