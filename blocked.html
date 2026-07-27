@@ -2,59 +2,92 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Stoic — Discipline Held</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="components.css" />
 <link rel="stylesheet" href="blocked.css" />
 </head>
 <body>
-  <div class="wrap">
-    <div class="mark-wrap">
-      <svg viewBox="0 0 84 84" fill="none" aria-hidden="true">
-        <rect width="84" height="84" rx="22" fill="url(#stoic-brand-grad-blocked)"/>
-        <path d="M18 24C18 22.8954 18.8954 22 20 22H64C65.1046 22 66 22.8954 66 24V27.5C66 28.0523 65.5523 28.5 65 28.5H19C18.4477 28.5 18 28.0523 18 27.5V24Z" fill="white"/>
-        <rect x="24.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
-        <rect x="38.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
-        <rect x="52.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
-        <path d="M18 59.5C18 58.9477 18.4477 58.5 19 58.5H65C65.5523 58.5 66 58.9477 66 59.5V63C66 64.1046 65.1046 65 64 65H20C18.8954 65 18 64.1046 18 63V59.5Z" fill="white"/>
-        <defs>
-          <linearGradient id="stoic-brand-grad-blocked" x1="0" y1="0" x2="84" y2="84" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#0284c7"/>
-            <stop offset="1" stop-color="#0369a1"/>
-          </linearGradient>
-        </defs>
-      </svg>
+  <div class="blocked-page-wrapper">
+    <div class="blocked-container">
+      
+      <!-- Top Bar: Brand -->
+      <header class="blocked-header">
+        <div class="brand-badge-row">
+          <div class="mark-wrap">
+            <svg viewBox="0 0 84 84" fill="none" aria-hidden="true">
+              <rect width="84" height="84" rx="22" fill="url(#stoic-brand-grad-blocked)"/>
+              <path d="M18 24C18 22.8954 18.8954 22 20 22H64C65.1046 22 66 22.8954 66 24V27.5C66 28.0523 65.5523 28.5 65 28.5H19C18.4477 28.5 18 28.0523 18 27.5V24Z" fill="white"/>
+              <rect x="24.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
+              <rect x="38.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
+              <rect x="52.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
+              <path d="M18 59.5C18 58.9477 18.4477 58.5 19 58.5H65C65.5523 58.5 66 58.9477 66 59.5V63C66 64.1046 65.1046 65 64 65H20C18.8954 65 18 64.1046 18 63V59.5Z" fill="white"/>
+              <defs>
+                <linearGradient id="stoic-brand-grad-blocked" x1="0" y1="0" x2="84" y2="84" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#0284c7"/>
+                  <stop offset="1" stop-color="#0369a1"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="brand-title-group">
+            <span class="brand-name">Stoic</span>
+            <span class="eyebrow-status" id="eyebrowStatus">DISCIPLINE HELD</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Layout Grid -->
+      <main class="blocked-grid">
+        
+        <!-- Left Column: Heading, Quote, Stats -->
+        <section class="blocked-pane pane-info">
+          <div class="pane-header-group">
+            <h1 id="headline">One moment</h1>
+            <p class="subhead" id="subhead">Loading…</p>
+          </div>
+
+          <div class="placard callout" id="placardBox">
+            <div class="callout-label" id="calloutLabel">Reality check</div>
+            <div class="callout-text" id="placardText"></div>
+          </div>
+
+          <div class="equivalency-box" id="equivalency"></div>
+
+          <div class="stat-section-wrapper">
+            <div class="stat-section-label">Usage Metrics</div>
+            <div class="stat-row stat-grid" id="statRow"></div>
+          </div>
+        </section>
+
+        <!-- Right Column: Interstitial & Actions -->
+        <section class="blocked-pane pane-actions">
+          <!-- Restraint Interstitial Card -->
+          <div id="restraintBox" class="restraint-card" style="display: none;">
+            <div class="restraint-type-badge" id="restraintBadge">MINDFUL RESTRAINT</div>
+            <div id="restraintWidget" class="restraint-widget"></div>
+          </div>
+
+          <div class="action-card-panel">
+            <div class="actions-group">
+              <button class="btn-primary btn-accent" id="continueBtn" type="button" style="display: none;" disabled>Continue to site</button>
+              <button class="btn-close btn-ghost" id="closeBtn" type="button">Go back</button>
+            </div>
+            <div class="reset-note-bar">
+              <div class="reset-note" id="resetNote"></div>
+            </div>
+          </div>
+
+          <div class="adjust-note">To adjust or remove this discipline, open Stoic from your toolbar.</div>
+        </section>
+
+      </main>
+
     </div>
-
-    <div class="eyebrow-status" id="eyebrowStatus">DISCIPLINE HELD</div>
-    <h1 id="headline">One moment</h1>
-    <p class="subhead" id="subhead">Loading…</p>
-
-    <div class="stat-row stat-grid" id="statRow"></div>
-
-    <!-- Restraint Interstitial Box -->
-    <div id="restraintBox" class="restraint-card" style="display: none;">
-      <div class="restraint-type-badge" id="restraintBadge">MINDFUL RESTRAINT</div>
-      <div id="restraintWidget" class="restraint-widget"></div>
-    </div>
-
-    <div class="placard callout" id="placardBox">
-      <div class="callout-label" id="calloutLabel">Reality check</div>
-      <div class="callout-text" id="placardText"></div>
-    </div>
-
-    <div class="equivalency" id="equivalency"></div>
-
-    <div class="actions" style="display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;">
-      <button class="btn-primary btn-accent" id="continueBtn" type="button" style="display: none;" disabled>Continue to site</button>
-      <button class="btn-close" id="closeBtn" type="button">Go back</button>
-      <div class="reset-note" id="resetNote"></div>
-    </div>
-
-    <div class="adjust-note">To adjust or remove this discipline, open Stoic from your toolbar.</div>
   </div>
 
 <script src="common.js"></script>

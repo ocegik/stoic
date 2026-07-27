@@ -11,24 +11,54 @@
   background: linear-gradient(180deg, var(--accent-soft), var(--accent));
   color: var(--accent-ink);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 10px);
   font-weight: 700;
   font-family: var(--sans);
   cursor: pointer;
+  padding: 12px 20px;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.2);
 }
-.btn-accent:active { filter: brightness(0.94); }
+.btn-accent:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.3);
+  filter: brightness(1.04);
+}
+.btn-accent:active {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
 .btn-accent:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
+.btn-accent:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
 
 .btn-ghost {
-  background: transparent;
+  background: var(--bg-raised);
   border: 1px solid var(--border);
   color: var(--text-muted);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 12px;
+  border-radius: var(--radius-sm, 10px);
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.btn-ghost:hover {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border-color: var(--accent-ring);
+  transform: translateY(-1px);
+}
+.btn-ghost:active {
+  transform: translateY(0);
 }
 .btn-ghost:focus-visible {
   outline: none;
@@ -41,11 +71,12 @@
   background: var(--bg-raised);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 8px;
-  padding: 9px 10px;
-  font-size: 12px;
+  border-radius: var(--radius-sm, 10px);
+  padding: 11px 14px;
+  font-size: 13.5px;
   font-family: var(--sans);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .field:focus {
   outline: none;
@@ -56,25 +87,26 @@
 .field.has-error { border-color: var(--error-border); }
 .field-error {
   color: var(--error);
-  font-size: 10.5px;
-  margin: -4px 0 8px 2px;
+  font-size: 11.5px;
+  margin: -4px 0 10px 2px;
 }
 
 .field-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 .field-row label {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
   flex: none;
-  width: 70px;
+  width: 80px;
 }
 .field-row .field { margin-bottom: 0; }
 .field-row .unit {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text-faint);
   flex: none;
   font-family: var(--mono);
@@ -85,88 +117,97 @@
   display: flex;
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px;
-  margin-bottom: 8px;
+  border-radius: var(--radius-md, 14px);
+  padding: 4px;
+  margin-bottom: 12px;
 }
 .seg-btn {
   flex: 1;
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-family: var(--sans);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 7px 4px;
-  border-radius: 6px;
-  transition: background .15s, color .15s;
+  padding: 9px 8px;
+  border-radius: var(--radius-sm, 10px);
+  transition: background 0.18s ease, color 0.18s ease, transform 0.15s ease;
 }
 .seg-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--accent-ring);
 }
-.seg-btn.active { background: var(--accent-dim); color: var(--accent-soft); }
+.seg-btn.active {
+  background: var(--bg-panel);
+  color: var(--accent-soft);
+  box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0,0,0,0.04));
+  font-weight: 700;
+}
 
-/* ---- stat grid ----
-   A row of equal-width cells, each a big monospace value over a small
-   uppercase label. Used for the popup's dashboard and the blocked page's
-   usage summary — same shape, different data. */
+/* ---- stat grid ---- */
 .stat-grid {
-  display: flex;
-  gap: 1px;
-  background: var(--border-soft);
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
 }
 .stat-cell {
-  flex: 1;
   background: var(--bg-panel);
-  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md, 14px);
+  padding: 16px 18px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.stat-cell:hover {
+  border-color: var(--border);
+  transform: translateY(-1px);
 }
 .stat-value {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-primary);
-  line-height: 1.2;
+  font-size: 20px;
+  line-height: 1.25;
 }
 .stat-label {
-  font-size: 9.5px;
+  font-size: 11px;
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-top: 3px;
+  margin-top: 5px;
   font-family: var(--sans);
   font-weight: 600;
 }
 
-/* ---- callout ----
-   A bordered panel with an accent left-edge, an uppercase label, and a
-   line of body text. Used for the blocked page's reality-check placard
-   and the popup's onboarding explainer. */
+/* ---- callout ---- */
 .callout {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  padding: 14px 16px;
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md, 14px);
+  padding: 20px 24px;
   text-align: left;
+  box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0,0,0,0.03));
 }
 .callout-label {
   font-family: var(--sans);
-  font-weight: 600;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent-soft);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .callout-text {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-primary);
-  line-height: 1.55;
+  line-height: 1.6;
+  font-weight: 450;
 }
-.callout-text + .callout-text { margin-top: 8px; }
+.callout-text + .callout-text { margin-top: 10px; }
