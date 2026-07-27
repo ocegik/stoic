@@ -167,6 +167,75 @@ async function render() {
   if (limitedSitesCountEl) limitedSitesCountEl.textContent = moderation.limitedSitesCount;
   if (limitsTriggeredEl) limitsTriggeredEl.textContent = moderation.limitsTriggeredToday;
   if (timeSavedValEl) timeSavedValEl.textContent = fmtMinutes(moderation.estimatedTimeSavedMinutes);
+
+  // 3. Classification Debugger
+  renderDebugInfo();
+}
+
+async function renderDebugInfo() {
+  const dbgToggleBtn = document.getElementById("debugToggleBtn");
+  const debugContent = document.getElementById("debugContent");
+  const debugBadgeSource = document.getElementById("debugBadgeSource");
+
+  if (dbgToggleBtn && debugContent && !dbgToggleBtn.dataset.wired) {
+    dbgToggleBtn.dataset.wired = "true";
+    dbgToggleBtn.addEventListener("click", () => {
+      const isHidden = debugContent.style.display === "none";
+      debugContent.style.display = isHidden ? "flex" : "none";
+    });
+  }
+
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) return;
+
+  try {
+    const info = await chrome.runtime.sendMessage({ type: "GET_CLASSIFICATION_DEBUG_INFO" });
+    if (!info) return;
+
+    const dbgVideoId = document.getElementById("dbgVideoId");
+    const dbgTitle = document.getElementById("dbgTitle");
+    const dbgChannel = document.getElementById("dbgChannel");
+    const dbgContentType = document.getElementById("dbgContentType");
+    const dbgChannelLookup = document.getElementById("dbgChannelLookup");
+    const dbgCacheStatus = document.getElementById("dbgCacheStatus");
+    const dbgSource = document.getElementById("dbgSource");
+    const dbgConfidence = document.getElementById("dbgConfidence");
+
+    if (dbgVideoId) dbgVideoId.textContent = info.metadata?.videoId || "--";
+    if (dbgTitle) dbgTitle.textContent = info.metadata?.title || "--";
+    if (dbgChannel) dbgChannel.textContent = info.metadata?.channelName || info.metadata?.channelId || "--";
+    if (dbgContentType) dbgContentType.textContent = info.metadata?.contentType || "video";
+
+    if (dbgChannelLookup) {
+      if (info.channelLookup?.hit) {
+        const cls = info.channelLookup.channel?.classification;
+        dbgChannelLookup.textContent = `HIT (${cls ? `${cls.macro}·${cls.micro}` : "Found"})`;
+        dbgChannelLookup.style.color = "var(--sem-green-soft)";
+      } else {
+        dbgChannelLookup.textContent = "MISS (Domain Fallback)";
+        dbgChannelLookup.style.color = "var(--text-muted)";
+      }
+    }
+
+    if (dbgCacheStatus) dbgCacheStatus.textContent = info.cacheStatus || "MISS";
+
+    const source = info.classification?.source || "domain_rule";
+    if (dbgSource) dbgSource.textContent = source;
+    if (debugBadgeSource) {
+      debugBadgeSource.textContent = source.includes("ai") ? "AI" : (source.includes("manual") ? "MANUAL" : (source.includes("channel") ? "Channel DB" : "Domain"));
+    }
+
+    if (dbgConfidence) {
+      const conf = Math.round((info.classification?.confidence || 0.8) * 100);
+      dbgConfidence.textContent = `${conf}%`;
+    }
+
+    const dbgReason = document.getElementById("dbgReason");
+    if (dbgReason) {
+      dbgReason.textContent = info.classification?.metadata?.reason || info.channelLookup?.channel?.reason || "--";
+    }
+  } catch {
+    /* Ignore background connection errors */
+  }
 }
 
 // Auto-refresh on DOM load
@@ -182,3 +251,4 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     }
   });
 }
+

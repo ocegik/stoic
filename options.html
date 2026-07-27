@@ -58,6 +58,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Rules
     </button>
+    <button class="nav-tab" data-target="tab-youtube-debug" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
+      YouTube & Debugger
+    </button>
     <button class="nav-tab" data-target="tab-sync" role="tab" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Preferences
@@ -318,6 +322,166 @@
       </div>
     </section>
 
+
+    <!-- TAB 6: YOUTUBE & CLASSIFICATION DEBUGGER -->
+    <section class="tab-panel" id="tab-youtube-debug" role="tabpanel" hidden>
+      <div class="dashboard-section">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+          <div>
+            <h2 class="section-title" style="margin: 0;">YouTube Content Classification & Debugger</h2>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Inspect live metadata extraction, channel database lookup, cache state, and confidence scores.</p>
+          </div>
+          <button class="btn-ghost" type="button" id="refreshDebugBtn">Refresh Inspector</button>
+        </div>
+
+        <!-- Live Inspector Card -->
+        <div class="card settings-card" style="margin-bottom: 20px;">
+          <h3>Active Tab Metadata Inspector</h3>
+          <div class="yt-debug-grid" style="margin-top: 14px;">
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Extracted Video ID</div>
+              <div class="debug-card-val" id="optDbgVideoId">--</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Video Title</div>
+              <div class="debug-card-val" id="optDbgTitle">--</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Channel Name & ID</div>
+              <div class="debug-card-val" id="optDbgChannel">--</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Content Type</div>
+              <div class="debug-card-val" id="optDbgContentType">--</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Channel DB Lookup</div>
+              <div class="debug-card-val" id="optDbgChannelLookup">MISS</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Cache Status</div>
+              <div class="debug-card-val" id="optDbgCacheStatus">MISS</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Classification Source</div>
+              <div class="debug-card-val" id="optDbgSource">domain_rule</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Confidence Score</div>
+              <div class="debug-card-val" id="optDbgConfidence">80%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Engine Settings Card -->
+        <div class="card settings-card" style="margin-bottom: 20px;">
+          <h3>AI Engine & Auto-Classification Settings</h3>
+          <p class="card-desc">Configure the AI provider, confidence thresholds, and background channel classification behaviors.</p>
+
+          <form id="aiSettingsForm" style="margin-top: 14px; display: grid; gap: 14px;">
+            <div class="field-row" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+              <div>
+                <label for="aiProviderSelect" class="field-label" style="margin:0;">AI Classifier Provider</label>
+                <div style="font-size: 11.5px; color: var(--text-muted);">Choose local heuristic analysis or custom remote LLM API.</div>
+              </div>
+              <select id="aiProviderSelect" class="field" style="max-width: 240px;">
+                <option value="heuristic">Local Heuristic (Fast & Offline)</option>
+                <option value="custom_api">Custom Remote AI API</option>
+              </select>
+            </div>
+
+            <div id="customApiFieldsGroup" style="display: none; grid-gap: 10px; padding: 12px; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 8px;">
+              <div>
+                <label for="aiApiKey" class="field-label">API Key</label>
+                <input type="password" id="aiApiKey" class="field" placeholder="sk-..." />
+              </div>
+              <div style="margin-top: 8px;">
+                <label for="aiApiEndpoint" class="field-label">API Endpoint URL</label>
+                <input type="url" id="aiApiEndpoint" class="field" placeholder="https://api.example.com/v1/classify" />
+              </div>
+            </div>
+
+            <div class="field-row" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+              <div>
+                <label for="aiConfidenceThreshold" class="field-label" style="margin:0;">Confidence Acceptance Threshold</label>
+                <div style="font-size: 11.5px; color: var(--text-muted);">Classifications with confidence below this threshold fall back to Unclassified.</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="range" id="aiConfidenceThreshold" min="0.50" max="0.95" step="0.05" value="0.70" style="cursor: pointer;" />
+                <span id="aiConfidenceVal" style="font-family: var(--mono); font-weight: 700; font-size: 13px; min-width: 40px;">70%</span>
+              </div>
+            </div>
+
+            <div class="field-row" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+              <div>
+                <label for="aiAutoClassifyToggle" class="field-label" style="margin:0;">Automatic Background Channel Classification</label>
+                <div style="font-size: 11.5px; color: var(--text-muted);">Automatically classify unknown channels when visiting YouTube videos.</div>
+              </div>
+              <input type="checkbox" id="aiAutoClassifyToggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
+              <button type="submit" id="saveAiSettingsBtn" class="btn-primary btn-accent" style="padding: 6px 16px;">Save AI Settings</button>
+              <span id="aiSettingsNote" class="settings-note" style="display: none; margin: 0; font-size: 12px;"></span>
+            </div>
+          </form>
+        </div>
+
+        <!-- Channel Database Card -->
+        <div class="card settings-card" style="margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <h3>Channel Database (yt_channels)</h3>
+              <p class="card-desc">Persisted YouTube channel classifications used for content-aware routing.</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-ghost" type="button" id="resetChannelDbBtn" style="color: var(--sem-red);" title="Wipe all channel classifications">Clear Channel DB</button>
+              <button class="btn-primary btn-accent" type="button" id="addChannelBtn">+ Add / Classify Channel</button>
+            </div>
+          </div>
+          <div class="table-wrapper" style="margin-top: 14px;">
+            <table class="table" id="channelsTable">
+              <thead>
+                <tr>
+                  <th>Channel ID / Name</th>
+                  <th>Classification</th>
+                  <th>Source & Rationale</th>
+                  <th>Confidence</th>
+                  <th>Last Updated</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="channelsTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Video Database Log Card -->
+        <div class="card settings-card">
+          <h3>Extracted Video Database (yt_videos)</h3>
+          <p class="card-desc">Recent YouTube videos visited and linked to channel IDs.</p>
+          <div class="table-wrapper" style="margin-top: 14px;">
+            <table class="table" id="videosTable">
+              <thead>
+                <tr>
+                  <th>Video ID</th>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Type</th>
+                  <th>Extracted At</th>
+                </tr>
+              </thead>
+              <tbody id="videosTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Modal for Creating / Editing Discipline -->
@@ -335,6 +499,7 @@
         <label class="field-label" style="margin-top: 10px;">Moderation Mode</label>
         <div class="segmented" id="optModalModeSeg">
           <button class="seg-btn active" type="button" data-value="limit">Time Limit</button>
+          <button class="seg-btn" type="button" data-value="restraint">Restraint Mode</button>
           <button class="seg-btn" type="button" data-value="block">Full Block</button>
         </div>
 
@@ -342,6 +507,25 @@
           <label for="optModalMinutes">Daily limit</label>
           <input class="field" type="number" id="optModalMinutes" value="30" min="1" />
           <span class="unit">min/day</span>
+        </div>
+
+        <div id="optModalRestraintRow" style="display:none; margin-top: 12px; flex-direction: column; gap: 10px;">
+          <div>
+            <label for="optModalRestraintType" class="field-label">Restraint Type</label>
+            <select class="field" id="optModalRestraintType">
+              <option value="countdown">Countdown Pause</option>
+              <option value="confirmation">Triple Confirmation</option>
+              <option value="quote">Motivational Quote</option>
+              <option value="reflection">Reflection Question</option>
+              <option value="math">Simple Math Puzzle</option>
+              <option value="random">Random Selection</option>
+            </select>
+          </div>
+          <div id="optModalCountdownGroup" class="field-row" style="margin-top: 6px;">
+            <label for="optModalCountdownSec">Countdown duration</label>
+            <input class="field" type="number" id="optModalCountdownSec" value="15" min="5" max="60" />
+            <span class="unit">sec (5–60s)</span>
+          </div>
         </div>
 
         <details class="disclosure" style="margin: 14px 0 0 0;">

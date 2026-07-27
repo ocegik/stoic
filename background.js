@@ -77,7 +77,7 @@ async function notifyThreshold(key, entry, pct, limitMinutes) {
 }
 
 async function navigateAfterTrip(tabId, key, entry, reason) {
-  if (entry.action === "redirect") {
+  if (entry.action === "redirect" && reason !== "restraint") {
     const dest = normalizeUrl(entry.redirectUrl);
     if (dest) {
       try {
@@ -88,9 +88,30 @@ async function navigateAfterTrip(tabId, key, entry, reason) {
       }
     }
   }
-  const url = chrome.runtime.getURL(
+  let targetUrl = "";
+  if (tabId) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab?.url && !tab.url.includes("blocked.html")) {
+        targetUrl = tab.url;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!targetUrl) targetUrl = `https://${key}`;
+
+  let url = chrome.runtime.getURL(
     `blocked.html?site=${encodeURIComponent(key)}&reason=${encodeURIComponent(reason)}`
   );
+  if (reason === "restraint") {
+    const rType = entry.restraintType || "countdown";
+    const rSec = entry.countdownSeconds || 15;
+    url = chrome.runtime.getURL(
+      `blocked.html?site=${encodeURIComponent(key)}&reason=restraint&restraintType=${encodeURIComponent(rType)}&countdownSeconds=${rSec}&targetUrl=${encodeURIComponent(targetUrl)}`
+    );
+  }
+
   try {
     await chrome.tabs.update(tabId, { url });
   } catch {
@@ -164,6 +185,13 @@ async function tick() {
 
   if (entry.mode === "block") {
     tripReason = "blocked";
+  } else if (entry.mode === "restraint") {
+    const hasPass = await hasActiveRestraintPass(key);
+    if (!hasPass) {
+      tripReason = "restraint";
+    } else {
+      entry.usedSeconds = (entry.usedSeconds || 0) + elapsedSeconds;
+    }
   } else if (entry.mode === "limit") {
     entry.usedSeconds = (entry.usedSeconds || 0) + elapsedSeconds;
     const limitSeconds = (activeRule.limitMinutes || 0) * 60;
@@ -200,6 +228,113 @@ async function tick() {
 // race to write it back, silently dropping one of the updates (e.g.
 // undercounting usedSeconds, or missing a trip). createCoalescingRunner
 // (background-logic.js) makes sure at most one tick runs at a time.
+let latestYouTubeMetadataByTab = {};
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "YOUTUBE_METADATA_UPDATE") {
+    const tabId = sender.tab?.id || activeState.tabId;
+    if (tabId && message.metadata) {
+      latestYouTubeMetadataByTab[tabId] = message.metadata;
+      recordYouTubeVisit(message.metadata).then(() => {
+        runTick();
+      }).catch((err) => console.error("[Stoic] recordYouTubeVisit failed", err));
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (message.type === "GET_CLASSIFICATION_DEBUG_INFO") {
+    handleGetDebugInfo().then(sendResponse).catch((err) => {
+      sendResponse({ error: err.message });
+    });
+    return true; // async response
+  }
+
+  if (message.type === "RECLASSIFY_CHANNEL") {
+    classifyUnknownChannel(message.metadata || { channelId: message.channelId, channelName: message.channelName }, { forceReclassify: true })
+      .then((updated) => {
+        runTick();
+        sendResponse({ success: true, channel: updated });
+      })
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  if (message.type === "MANUAL_OVERRIDE_CHANNEL") {
+    saveChannel({
+      channelId: message.channelId,
+      channelName: message.channelName,
+      classification: message.classification,
+      confidence: 1.0,
+      reason: "Manual user override in Stoic Debugger",
+      source: "manual",
+      updatedAt: new Date().toISOString(),
+    })
+      .then((updated) => {
+        runTick();
+        sendResponse({ success: true, channel: updated });
+      })
+      .catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+});
+
+async function handleGetDebugInfo() {
+  const current = await resolveActiveTab();
+  if (!current.tabId || !current.domain) {
+    return {
+      domain: current.domain || null,
+      url: null,
+      metadata: null,
+      channelLookup: { hit: false, channel: null },
+      cacheStatus: "MISS",
+      classification: { macro: "General", micro: "General Browsing", confidence: 0.5, source: "fallback" },
+    };
+  }
+
+  let tabUrl = null;
+  try {
+    const tab = await chrome.tabs.get(current.tabId);
+    tabUrl = tab.url;
+  } catch {
+    /* ignore */
+  }
+
+  const ytMeta = latestYouTubeMetadataByTab[current.tabId] || null;
+  const contextInput = ytMeta || { domain: current.domain, url: tabUrl };
+
+  const context = defaultExtractorRegistry.extract(contextInput);
+  const sites = await getSites();
+  const cached = defaultClassificationCache.get(contextInput, sites);
+  const cacheStatus = cached ? "HIT" : "MISS";
+
+  const result = await classifyContextAsync(contextInput, sites);
+
+  let channelLookup = { hit: false, channel: null };
+  const query = context.channelId || context.channelName;
+  if (query) {
+    const found = await getChannel(query);
+    if (found) {
+      channelLookup = { hit: true, channel: found };
+    }
+  }
+
+  return {
+    domain: current.domain,
+    url: tabUrl || context.url,
+    metadata: {
+      videoId: context.videoId || null,
+      title: context.title || null,
+      channelId: context.channelId || null,
+      channelName: context.channelName || null,
+      contentType: context.contentType || "video",
+    },
+    channelLookup,
+    cacheStatus,
+    classification: result.toObject(),
+  };
+}
+
 const runTick = createCoalescingRunner(tick, (err) => console.error("[Stoic] tick failed", err));
 
 chrome.alarms.create(TICK_ALARM, { periodInMinutes: CHECK_INTERVAL_SECONDS / 60 });
@@ -214,3 +349,4 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.windows.onFocusChanged.addListener(() => runTick());
 
 runTick();
+

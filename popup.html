@@ -97,6 +97,53 @@
     </button>
   </div>
 
+  <!-- Developer / Classification Debugger (Collapsible) -->
+  <div class="debug-panel-wrapper">
+    <button class="debug-toggle-btn" id="debugToggleBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+      <span>Classification Debugger</span>
+      <span class="debug-badge" id="debugBadgeSource">Domain</span>
+    </button>
+    <div class="debug-content" id="debugContent" style="display: none;">
+      <div class="debug-row">
+        <span class="debug-lbl">Video ID:</span>
+        <span class="debug-val" id="dbgVideoId">--</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">Title:</span>
+        <span class="debug-val" id="dbgTitle">--</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">Channel:</span>
+        <span class="debug-val" id="dbgChannel">--</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">Content Type:</span>
+        <span class="debug-val" id="dbgContentType">--</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">Channel DB Lookup:</span>
+        <span class="debug-val" id="dbgChannelLookup">MISS</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">Cache Status:</span>
+        <span class="debug-val" id="dbgCacheStatus">MISS</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">Source:</span>
+        <span class="debug-val" id="dbgSource">domain_rule</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">Confidence:</span>
+        <span class="debug-val" id="dbgConfidence">80%</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-lbl">AI Rationale:</span>
+        <span class="debug-val" id="dbgReason">--</span>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script src="common.js"></script>

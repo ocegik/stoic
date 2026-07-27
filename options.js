@@ -92,6 +92,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optModalStartTime = document.getElementById("optModalStartTime");
   const optModalEndTime = document.getElementById("optModalEndTime");
 
+  const optModalRestraintRow = document.getElementById("optModalRestraintRow");
+  const optModalRestraintType = document.getElementById("optModalRestraintType");
+  const optModalCountdownGroup = document.getElementById("optModalCountdownGroup");
+  const optModalCountdownSec = document.getElementById("optModalCountdownSec");
+
   let modalMode = "limit";
 
   function wireSegmented(container, onChange) {
@@ -113,7 +118,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireSegmented(optModalModeSeg, (val) => {
     modalMode = val;
     optModalLimitRow.style.display = val === "limit" ? "flex" : "none";
+    if (optModalRestraintRow) optModalRestraintRow.style.display = val === "restraint" ? "flex" : "none";
   });
+
+  if (optModalRestraintType) {
+    optModalRestraintType.addEventListener("change", () => {
+      const showSec = optModalRestraintType.value === "countdown" || optModalRestraintType.value === "random";
+      if (optModalCountdownGroup) optModalCountdownGroup.style.display = showSec ? "flex" : "none";
+    });
+  }
 
   if (siteSearchInput) {
     siteSearchInput.addEventListener("input", (e) => {
@@ -380,6 +393,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:var(--sem-amber-dim); color:var(--sem-amber-soft); border:1px solid var(--sem-amber-border);">${item.entry.limitMinutes || 30}m LIMIT</span>`;
       } else if (item.mode === "block") {
         statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:var(--sem-red-dim); color:var(--sem-red-soft); border:1px solid var(--sem-red-border);">RESTRAINT</span>`;
+      } else if (item.mode === "restraint") {
+        const rLabel = (item.entry?.restraintType || "countdown").toUpperCase();
+        statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:rgba(2, 132, 199, 0.12); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.25);">${rLabel} RESTRAINT</span>`;
       }
 
       let categoryOptionsHtml = "";
@@ -466,7 +482,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderDisciplines(moderation) {
     if (!optDisciplinesGrid) return;
     const keys = Object.keys(sites).filter(
-      (d) => sites[d].mode === "limit" || sites[d].mode === "block"
+      (d) => sites[d].mode === "limit" || sites[d].mode === "block" || sites[d].mode === "restraint"
     );
 
     const filteredKeys = keys.filter((domain) => {
@@ -492,11 +508,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         card.className = "discipline-card";
 
         const isBlock = entry.mode === "block";
+        const isRestraint = entry.mode === "restraint";
+        let badgeText = "Time Limit";
+        if (isBlock) badgeText = "Full Block";
+        else if (isRestraint) badgeText = "Restraint Mode";
+
+        let ruleText = `${entry.limitMinutes || 30} min/day`;
+        if (isBlock) ruleText = "Blocked full day";
+        else if (isRestraint) {
+          const rTypeStr = (entry.restraintType || "countdown").toUpperCase();
+          ruleText = `${rTypeStr} (${entry.countdownSeconds || 15}s)`;
+        }
+
         const rule = getActiveRule(entry);
         const usedSec = usageSecondsForDate(entry, todayStr());
         const usedTodayStr = fmtMinutes(usedSec / 60);
         const limitSec = (entry.limitMinutes || 30) * 60;
-        const usedPct = isBlock ? 100 : Math.min(100, Math.round((usedSec / limitSec) * 100));
+        const usedPct = isBlock ? 100 : (isRestraint ? 0 : Math.min(100, Math.round((usedSec / limitSec) * 100)));
         const streak = limitStreakDays(entry);
 
         let progressColor = "var(--sem-green)";
@@ -508,17 +536,17 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div>
             <div class="discipline-card-header">
               <span class="discipline-domain" title="${domain}">${displayName}</span>
-              <span class="discipline-badge mode-${entry.mode}">${isBlock ? "Restraint" : "Time Limit"}</span>
+              <span class="discipline-badge mode-${entry.mode}">${badgeText}</span>
             </div>
             <div class="discipline-meta" style="margin-top: 10px;">
               <div><strong>Hierarchy:</strong> <span class="macro-badge macro-${taxonomy.macro.toLowerCase()}">${taxonomy.macro}</span> <span class="micro-badge">${taxonomy.micro}</span></div>
-              <div><strong>Rule:</strong> ${isBlock ? "Blocked full day" : `${entry.limitMinutes || 30} min/day`}</div>
+              <div><strong>Rule:</strong> ${ruleText}</div>
               <div><strong>Tracked Today:</strong> ${usedTodayStr}</div>
-              <div><strong>Limits Tripped:</strong> ${entry.timesTripped || 0}×</div>
+              <div><strong>Times Tripped:</strong> ${entry.timesTripped || 0}×</div>
               ${streak > 0 ? `<div><strong>Streak:</strong> <span style="color:var(--text-primary); font-weight:700;">${streak} day${streak === 1 ? "" : "s"}</span></div>` : ""}
               <div><strong>Status:</strong> ${entry.paused ? "Paused" : rule.active ? "Active" : "Off-schedule"}</div>
             </div>
-            ${!isBlock ? `
+            ${!isBlock && !isRestraint ? `
               <div class="cat-progress-bg" style="margin-top: 10px;">
                 <div class="cat-progress-fill" style="width:${usedPct}%; background:${progressColor};"></div>
               </div>
@@ -586,6 +614,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       optModalDomain.disabled = true;
       modalMode = entry.mode === "unconstrained" ? "limit" : entry.mode;
       optModalMinutes.value = entry.limitMinutes || 30;
+      if (optModalRestraintType) optModalRestraintType.value = entry.restraintType || "countdown";
+      if (optModalCountdownSec) optModalCountdownSec.value = entry.countdownSeconds || 15;
 
       const schedule = normalizeSchedule(entry.schedule);
       optModalStartTime.value = schedule.startTime || "";
@@ -601,6 +631,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       optModalDomain.disabled = false;
       modalMode = "limit";
       optModalMinutes.value = "30";
+      if (optModalRestraintType) optModalRestraintType.value = "countdown";
+      if (optModalCountdownSec) optModalCountdownSec.value = "15";
       optModalStartTime.value = "";
       optModalEndTime.value = "";
       optModalDayPicker.querySelectorAll(".day-btn").forEach((btn) => btn.classList.add("active"));
@@ -611,6 +643,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       btn.classList.toggle("active", isMatch);
     });
     optModalLimitRow.style.display = modalMode === "limit" ? "flex" : "none";
+    if (optModalRestraintRow) optModalRestraintRow.style.display = modalMode === "restraint" ? "flex" : "none";
+
+    const showSec = !optModalRestraintType || optModalRestraintType.value === "countdown" || optModalRestraintType.value === "random";
+    if (optModalCountdownGroup) optModalCountdownGroup.style.display = showSec ? "flex" : "none";
 
     optModal.showModal();
   }
@@ -646,12 +682,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     const limitMin = Number(optModalMinutes.value) || 30;
+    const rType = optModalRestraintType ? optModalRestraintType.value : "countdown";
+    const cSec = optModalCountdownSec ? (Math.max(5, Math.min(60, Number(optModalCountdownSec.value) || 15))) : 15;
     const existing = sites[rawDomain] || {};
 
     sites[rawDomain] = {
       ...existing,
       mode: modalMode,
       limitMinutes: modalMode === "limit" ? limitMin : 0,
+      restraintType: modalMode === "restraint" ? rType : (existing.restraintType || "countdown"),
+      countdownSeconds: modalMode === "restraint" ? cSec : (existing.countdownSeconds || 15),
       schedule: {
         days: selectedDays,
         startTime: optModalStartTime.value || "",
@@ -748,5 +788,292 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // ===== YouTube & Classification Debugger Inspector & AI Settings =====
+  const refreshDebugBtn = document.getElementById("refreshDebugBtn");
+  const addChannelBtn = document.getElementById("addChannelBtn");
+  const resetChannelDbBtn = document.getElementById("resetChannelDbBtn");
+
+  const aiSettingsForm = document.getElementById("aiSettingsForm");
+  const aiProviderSelect = document.getElementById("aiProviderSelect");
+  const customApiFieldsGroup = document.getElementById("customApiFieldsGroup");
+  const aiApiKey = document.getElementById("aiApiKey");
+  const aiApiEndpoint = document.getElementById("aiApiEndpoint");
+  const aiConfidenceThreshold = document.getElementById("aiConfidenceThreshold");
+  const aiConfidenceVal = document.getElementById("aiConfidenceVal");
+  const aiAutoClassifyToggle = document.getElementById("aiAutoClassifyToggle");
+  const aiSettingsNote = document.getElementById("aiSettingsNote");
+
+  async function loadAndRenderAISettings() {
+    if (!aiSettingsForm) return;
+    const settings = await getAISettings();
+    if (aiProviderSelect) aiProviderSelect.value = settings.provider || "heuristic";
+    if (aiApiKey) aiApiKey.value = settings.apiKey || "";
+    if (aiApiEndpoint) aiApiEndpoint.value = settings.apiEndpoint || "";
+    if (aiConfidenceThreshold) {
+      aiConfidenceThreshold.value = settings.confidenceThreshold !== undefined ? settings.confidenceThreshold : 0.70;
+      if (aiConfidenceVal) aiConfidenceVal.textContent = `${Math.round(aiConfidenceThreshold.value * 100)}%`;
+    }
+    if (aiAutoClassifyToggle) aiAutoClassifyToggle.checked = settings.autoClassify !== false;
+
+    if (customApiFieldsGroup) {
+      customApiFieldsGroup.style.display = aiProviderSelect.value === "custom_api" ? "grid" : "none";
+    }
+  }
+
+  if (aiProviderSelect) {
+    aiProviderSelect.addEventListener("change", () => {
+      if (customApiFieldsGroup) {
+        customApiFieldsGroup.style.display = aiProviderSelect.value === "custom_api" ? "grid" : "none";
+      }
+    });
+  }
+
+  if (aiConfidenceThreshold) {
+    aiConfidenceThreshold.addEventListener("input", () => {
+      if (aiConfidenceVal) {
+        aiConfidenceVal.textContent = `${Math.round(aiConfidenceThreshold.value * 100)}%`;
+      }
+    });
+  }
+
+  if (aiSettingsForm) {
+    aiSettingsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const updated = {
+        provider: aiProviderSelect ? aiProviderSelect.value : "heuristic",
+        apiKey: aiApiKey ? aiApiKey.value.trim() : "",
+        apiEndpoint: aiApiEndpoint ? aiApiEndpoint.value.trim() : "",
+        confidenceThreshold: aiConfidenceThreshold ? parseFloat(aiConfidenceThreshold.value) : 0.70,
+        autoClassify: aiAutoClassifyToggle ? aiAutoClassifyToggle.checked : true,
+      };
+      await saveAISettings(updated);
+
+      if (aiSettingsNote) {
+        aiSettingsNote.textContent = "AI Settings saved successfully!";
+        aiSettingsNote.className = "settings-note success";
+        aiSettingsNote.style.display = "inline";
+        setTimeout(() => {
+          aiSettingsNote.style.display = "none";
+        }, 3000);
+      }
+    });
+  }
+
+  if (refreshDebugBtn) {
+    refreshDebugBtn.addEventListener("click", () => renderYouTubeDebugTab());
+  }
+
+  if (resetChannelDbBtn) {
+    resetChannelDbBtn.addEventListener("click", async () => {
+      if (confirm("Are you sure you want to clear all YouTube channel classifications?")) {
+        await saveChannelDatabase({});
+        renderYouTubeDebugTab();
+      }
+    });
+  }
+
+  if (addChannelBtn) {
+    addChannelBtn.addEventListener("click", async () => {
+      const channelQuery = prompt("Enter YouTube Channel Name or Channel ID (e.g. Veritasium or UC12345):");
+      if (!channelQuery || !channelQuery.trim()) return;
+
+      const microCategory = prompt("Enter Classification Micro Category for this channel (e.g. Study, Coding, Streaming, Gaming, News):", "Study");
+      if (!microCategory || !microCategory.trim()) return;
+
+      const macroCategory = MICRO_TO_MACRO[microCategory.trim()] || "Productivity";
+
+      await saveChannel({
+        channelId: channelQuery.trim(),
+        channelName: channelQuery.trim(),
+        classification: { macro: macroCategory, micro: microCategory.trim() },
+        confidence: 1.0,
+        reason: "Manual addition via Stoic Debugger",
+        source: "manual",
+      });
+
+      renderYouTubeDebugTab();
+    });
+  }
+
+  async function renderYouTubeDebugTab() {
+    await loadAndRenderAISettings();
+    // 1. Live Debug Inspector
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      try {
+        const info = await chrome.runtime.sendMessage({ type: "GET_CLASSIFICATION_DEBUG_INFO" });
+        if (info) {
+          const optDbgVideoId = document.getElementById("optDbgVideoId");
+          const optDbgTitle = document.getElementById("optDbgTitle");
+          const optDbgChannel = document.getElementById("optDbgChannel");
+          const optDbgContentType = document.getElementById("optDbgContentType");
+          const optDbgChannelLookup = document.getElementById("optDbgChannelLookup");
+          const optDbgCacheStatus = document.getElementById("optDbgCacheStatus");
+          const optDbgSource = document.getElementById("optDbgSource");
+          const optDbgConfidence = document.getElementById("optDbgConfidence");
+
+          if (optDbgVideoId) optDbgVideoId.textContent = info.metadata?.videoId || "--";
+          if (optDbgTitle) optDbgTitle.textContent = info.metadata?.title || "--";
+          if (optDbgChannel) optDbgChannel.textContent = info.metadata?.channelName || info.metadata?.channelId || "--";
+          if (optDbgContentType) optDbgContentType.textContent = info.metadata?.contentType || "video";
+
+          if (optDbgChannelLookup) {
+            if (info.channelLookup?.hit) {
+              const cls = info.channelLookup.channel?.classification;
+              optDbgChannelLookup.textContent = `HIT (${cls ? `${cls.macro}·${cls.micro}` : "Found"})`;
+              optDbgChannelLookup.style.color = "var(--sem-green)";
+            } else {
+              optDbgChannelLookup.textContent = "MISS (Domain Fallback)";
+              optDbgChannelLookup.style.color = "var(--text-muted)";
+            }
+          }
+
+          if (optDbgCacheStatus) optDbgCacheStatus.textContent = info.cacheStatus || "MISS";
+          if (optDbgSource) optDbgSource.textContent = info.classification?.source || "domain_rule";
+          if (optDbgConfidence) {
+            const conf = Math.round((info.classification?.confidence || 0.8) * 100);
+            optDbgConfidence.textContent = `${conf}%`;
+          }
+        }
+      } catch {
+        /* Ignore background connection errors */
+      }
+    }
+
+    // 2. Channel Database (yt_channels) Table
+    const channelsTableBody = document.getElementById("channelsTableBody");
+    if (channelsTableBody) {
+      channelsTableBody.innerHTML = "";
+      const channels = await getChannelDatabase();
+      const channelKeys = Object.keys(channels);
+
+      if (channelKeys.length === 0) {
+        channelsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No channel classifications saved yet in Channel Database. Click "+ Add / Classify Channel" above.</td></tr>`;
+      } else {
+        const uniqueChannels = new Map();
+        Object.values(channels).forEach((c) => {
+          if (c && c.channelId) uniqueChannels.set(c.channelId, c);
+        });
+
+        uniqueChannels.forEach((channel) => {
+          const row = document.createElement("tr");
+          const cls = channel.classification || { macro: "Leisure", micro: "Streaming" };
+          const confPct = Math.round((channel.confidence || 0.9) * 100);
+          const dateStr = channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : "--";
+
+          const isAI = channel.source === "ai" || channel.source === "ai_unclassified";
+          const srcBadge = isAI ? `<span class="micro-badge" style="background: rgba(2, 132, 199, 0.12); color: #0284c7; border-color: rgba(2, 132, 199, 0.25);">AI</span>` : `<span class="micro-badge" style="background: rgba(168, 85, 247, 0.12); color: #a855f7; border-color: rgba(168, 85, 247, 0.25);">MANUAL</span>`;
+          const reasonText = channel.reason || (isAI ? "AI classification" : "Manual user override");
+
+          row.innerHTML = `
+            <td>
+              <div style="font-weight: 700;">${channel.channelName || channel.channelId}</div>
+              <div style="font-size: 11px; color: var(--text-faint); font-family: var(--mono);">${channel.channelId}</div>
+            </td>
+            <td>
+              <span class="micro-badge">${cls.macro} · ${cls.micro}</span>
+            </td>
+            <td>
+              <div>${srcBadge}</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 220px; word-break: break-word;">${reasonText}</div>
+            </td>
+            <td>
+              <span style="font-family: var(--mono); font-weight: 700;">${confPct}%</span>
+            </td>
+            <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
+            <td>
+              <button class="btn-ghost reclass-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Reclassify channel via AI">AI Reclassify</button>
+              <button class="btn-ghost edit-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Manually override channel category">Override</button>
+              <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--sem-red);" title="Reset/Delete channel classification">Reset</button>
+            </td>
+          `;
+
+          const reclassBtn = row.querySelector(".reclass-ch-btn");
+          if (reclassBtn) {
+            reclassBtn.addEventListener("click", async () => {
+              reclassBtn.textContent = "Classifying...";
+              reclassBtn.disabled = true;
+              try {
+                await classifyUnknownChannel({ channelId: channel.channelId, channelName: channel.channelName }, { forceReclassify: true });
+                renderYouTubeDebugTab();
+              } catch (err) {
+                alert("Reclassification failed: " + err.message);
+              } finally {
+                reclassBtn.disabled = false;
+                reclassBtn.textContent = "AI Reclassify";
+              }
+            });
+          }
+
+          const editBtn = row.querySelector(".edit-ch-btn");
+          if (editBtn) {
+            editBtn.addEventListener("click", async () => {
+              const newMicro = prompt(`Enter manual micro category for ${channel.channelName || channel.channelId}:`, cls.micro);
+              if (!newMicro || !newMicro.trim()) return;
+              const newMacro = MICRO_TO_MACRO[newMicro.trim()] || "Productivity";
+              await saveChannel({
+                ...channel,
+                classification: { macro: newMacro, micro: newMicro.trim() },
+                confidence: 1.0,
+                reason: "Manual user override in Stoic Debugger",
+                source: "manual",
+                updatedAt: new Date().toISOString(),
+              });
+              renderYouTubeDebugTab();
+            });
+          }
+
+          const delBtn = row.querySelector(".del-ch-btn");
+          if (delBtn) {
+            delBtn.addEventListener("click", async () => {
+              if (confirm(`Remove ${channel.channelName || channel.channelId} from Channel Database?`)) {
+                const db = await getChannelDatabase();
+                delete db[channel.channelId];
+                if (channel.channelName) delete db[channel.channelName];
+                await saveChannelDatabase(db);
+                renderYouTubeDebugTab();
+              }
+            });
+          }
+
+          channelsTableBody.appendChild(row);
+        });
+      }
+    }
+
+    // 3. Video Database (yt_videos) Table
+    const videosTableBody = document.getElementById("videosTableBody");
+    if (videosTableBody) {
+      videosTableBody.innerHTML = "";
+      const videos = await getVideoDatabase();
+      const videoList = Object.values(videos).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)).slice(0, 15);
+
+      if (videoList.length === 0) {
+        videosTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-faint); padding: 16px;">No video metadata extracted yet. Visit YouTube to see extracted videos here.</td></tr>`;
+      } else {
+        videoList.forEach((v) => {
+          const row = document.createElement("tr");
+          const dateStr = v.updatedAt ? new Date(v.updatedAt).toLocaleTimeString() : "--";
+          row.innerHTML = `
+            <td style="font-family: var(--mono); font-weight: 700; font-size: 11.5px;">${v.videoId}</td>
+            <td style="font-weight: 600; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${v.title || "--"}</td>
+            <td>${v.channelName || v.channelId || "--"}</td>
+            <td><span class="micro-badge">${v.contentType || "video"}</span></td>
+            <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
+          `;
+          videosTableBody.appendChild(row);
+        });
+      }
+    }
+  }
+
+  // Include in tab navigation and periodic refresh
+  const origRenderAll = renderAll;
+  renderAll = function() {
+    if (typeof origRenderAll === "function") origRenderAll();
+    renderYouTubeDebugTab();
+  };
+
   loadData();
+  renderYouTubeDebugTab();
 });
+

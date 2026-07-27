@@ -35,15 +35,22 @@
 
     <div class="stat-row stat-grid" id="statRow"></div>
 
-    <div class="placard callout">
-      <div class="callout-label">Reality check</div>
+    <!-- Restraint Interstitial Box -->
+    <div id="restraintBox" class="restraint-card" style="display: none;">
+      <div class="restraint-type-badge" id="restraintBadge">MINDFUL RESTRAINT</div>
+      <div id="restraintWidget" class="restraint-widget"></div>
+    </div>
+
+    <div class="placard callout" id="placardBox">
+      <div class="callout-label" id="calloutLabel">Reality check</div>
       <div class="callout-text" id="placardText"></div>
     </div>
 
     <div class="equivalency" id="equivalency"></div>
 
-    <div class="actions">
-      <button class="btn-close btn-accent" id="closeBtn" type="button">Close this tab</button>
+    <div class="actions" style="display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;">
+      <button class="btn-primary btn-accent" id="continueBtn" type="button" style="display: none;" disabled>Continue to site</button>
+      <button class="btn-close" id="closeBtn" type="button">Go back</button>
       <div class="reset-note" id="resetNote"></div>
     </div>
 

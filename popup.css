@@ -372,3 +372,75 @@ body {
   background: var(--bg-panel);
   border-color: var(--border);
 }
+
+/* Classification Debugger */
+.debug-panel-wrapper {
+  margin-top: 10px;
+  background: var(--bg-raised);
+  border: 1px dashed var(--border-soft);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.debug-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.debug-toggle-btn svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.debug-badge {
+  margin-left: auto;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  background: var(--bg-panel);
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.debug-content {
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+}
+
+.debug-lbl {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.debug-val {
+  font-family: var(--mono);
+  color: var(--text-primary);
+  font-weight: 600;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
