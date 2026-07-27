@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Stoic · Quick Glance Control Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="brand-group">
+      <div class="brand-mark">
+        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="url(#stoic-brand-grad-popup)"/>
+          <path d="M7 9C7 8.44772 7.44772 8 8 8H24C24.5523 8 25 8.44772 25 9V10.5C25 10.7761 24.7761 11 24.5 11H7.5C7.22386 11 7 10.7761 7 10.5V9Z" fill="white"/>
+          <rect x="9.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
+          <rect x="14.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
+          <rect x="19.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
+          <path d="M7 23.5C7 23.2239 7.22386 23 7.5 23H24.5C24.7761 23 25 23.2239 25 23.5V24.5C25 25.0523 24.5523 25.5 24 25.5H8C7.44772 25.5 7 25.0523 7 24.5V23.5Z" fill="white"/>
+          <defs>
+            <linearGradient id="stoic-brand-grad-popup" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#0284c7"/>
+              <stop offset="1" stop-color="#0369a1"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="brand-title">Stoic</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode" aria-label="Toggle Light / Dark Mode">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="display:none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Hero Overview: Today's Time & Daily Comparison & Circular Focus Score -->
+  <div class="hero-overview">
+    <div class="time-group">
+      <div class="hero-time-val" id="todayTotal">0m</div>
+      <div class="hero-time-lbl">Today's Browsing</div>
+      <div class="hero-time-comp" id="dailyComp">-- vs yesterday</div>
+    </div>
+    <div class="focus-gauge-wrapper" id="focusGauge">
+      <!-- Circular progress gauge rendered dynamically -->
+    </div>
+  </div>
+
+  <!-- Top 3 Websites Section -->
+  <div class="top-sites-section">
+    <div class="section-tag">TOP WEBSITES</div>
+    <div class="top-sites-list" id="topSitesList"></div>
+  </div>
+
+  <!-- Compact Behaviour Summary -->
+  <div class="behaviour-summary">
+    <div class="stat-item">
+      <span class="stat-val" id="limitsTriggered">0</span>
+      <span class="stat-lbl">Limits Hit</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-val" id="limitedSitesCount">0</span>
+      <span class="stat-lbl">Rules Active</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-val positive" id="timeSavedVal">0m</span>
+      <span class="stat-lbl">Time Saved</span>
+    </div>
+  </div>
+
+  <!-- Primary Action Buttons -->
+  <div class="action-buttons">
+    <button class="btn-action primary" id="openDashboardBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="9" rx="1"/>
+        <rect x="14" y="3" width="7" height="5" rx="1"/>
+        <rect x="14" y="12" width="7" height="9" rx="1"/>
+        <rect x="3" y="16" width="7" height="5" rx="1"/>
+      </svg>
+      Open Dashboard
+    </button>
+    <button class="btn-action secondary" id="manageRulesBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      Manage Rules
+    </button>
+  </div>
+
+</div>
+
+<script src="common.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

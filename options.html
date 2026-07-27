@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stoic — Browsing Analytics & Moderation Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="options.css" />
+</head>
+<body>
+<div class="options-container">
+
+  <!-- Header -->
+  <header class="options-header">
+    <div class="header-brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="url(#stoic-brand-grad-opt)"/>
+          <path d="M7 9C7 8.44772 7.44772 8 8 8H24C24.5523 8 25 8.44772 25 9V10.5C25 10.7761 24.7761 11 24.5 11H7.5C7.22386 11 7 10.7761 7 10.5V9Z" fill="white"/>
+          <rect x="9.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
+          <rect x="14.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
+          <rect x="19.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
+          <path d="M7 23.5C7 23.2239 7.22386 23 7.5 23H24.5C24.7761 23 25 23.2239 25 23.5V24.5C25 25.0523 24.5523 25.5 24 25.5H8C7.44772 25.5 7 25.0523 7 24.5V23.5Z" fill="white"/>
+          <defs>
+            <linearGradient id="stoic-brand-grad-opt" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#0284c7"/>
+              <stop offset="1" stop-color="#0369a1"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <h1 class="header-title">Stoic</h1>
+        <p class="header-subtitle">Browsing Analytics & Moderation</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="options-nav" role="tablist">
+    <button class="nav-tab active" data-target="tab-overview" role="tab" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Overview
+    </button>
+    <button class="nav-tab" data-target="tab-analysis" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Detailed Analysis
+    </button>
+    <button class="nav-tab" data-target="tab-categories" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Categories
+    </button>
+    <button class="nav-tab" data-target="tab-rules" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Rules
+    </button>
+    <button class="nav-tab" data-target="tab-sync" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Preferences
+    </button>
+    <button class="nav-tab" data-target="tab-backup" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Backup
+    </button>
+  </nav>
+
+  <!-- Main Content Sections -->
+  <main class="options-main">
+
+    <!-- TAB 1: OVERVIEW -->
+    <section class="tab-panel active" id="tab-overview" role="tabpanel">
+
+      <!-- HERO SECTION: Visual Anchor & Focus Score Component -->
+      <div class="hero-anchor-section">
+        <div class="hero-primary">
+          <div class="hero-primary-val" id="optTodayTotal">0m</div>
+          <div class="hero-primary-lbl">Today's Browsing Time</div>
+        </div>
+
+        <!-- Focus Score Component -->
+        <div class="focus-score-component">
+          <div class="focus-gauge-box">
+            <svg class="focus-gauge-svg" viewBox="0 0 36 36">
+              <path class="focus-gauge-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path class="focus-gauge-fill" id="optFocusGaugePath" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <span class="focus-gauge-val" id="optFocusScore">100%</span>
+          </div>
+          <div class="focus-score-info">
+            <div class="focus-score-title">Focus Score</div>
+            <div class="focus-score-sub" id="optFocusScoreSub">High Restraint</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOP WEBSITES SECTION (Part 4 Compact Rows) -->
+      <div class="overview-section" style="margin-top: 48px;">
+        <h2 class="overview-section-title">Top Websites</h2>
+        <div class="top-websites-list" id="optTopWebsitesList"></div>
+      </div>
+
+      <!-- BEHAVIOUR SUMMARY SECTION (Part 4 Compact Metrics Row) -->
+      <div class="overview-section" style="margin-top: 48px;">
+        <h2 class="overview-section-title">Behaviour Summary</h2>
+        <div class="overview-behaviour-row">
+          <div class="compact-metric-item">
+            <span class="compact-metric-val" id="optOverviewTrippedCount">0</span>
+            <span class="compact-metric-lbl">Limits Triggered</span>
+          </div>
+          <div class="compact-metric-item">
+            <span class="compact-metric-val" id="optOverviewRulesActive">0</span>
+            <span class="compact-metric-lbl">Rules Active</span>
+          </div>
+          <div class="compact-metric-item">
+            <span class="compact-metric-val positive" id="optOverviewTimeSaved">0m</span>
+            <span class="compact-metric-lbl">Time Saved</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- TAB 2: DETAILED ANALYSIS -->
+    <section class="tab-panel" id="tab-analysis" role="tabpanel" hidden>
+      <div class="dashboard-section">
+        <h2 class="section-title">Session Insights & Distribution</h2>
+
+        <!-- Today's AI Insight Card -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="insight-body">
+            <div class="insight-badge">Session Insight</div>
+            <div id="optInsightText" class="insight-text">Analyzing session activity...</div>
+          </div>
+        </div>
+
+        <!-- 7-Day Browsing Time Distribution -->
+        <div class="card card-secondary" style="margin-bottom: 24px;">
+          <div class="card-header-flex">
+            <div>
+              <h3>7-Day Browsing Time Distribution</h3>
+              <p class="card-desc">Daily comparison of active browsing duration over the past week</p>
+            </div>
+          </div>
+          <div class="analytics-chart" id="optAnalyticsChart"></div>
+        </div>
+
+        <!-- Websites Visited Audit Table -->
+        <div class="card card-secondary">
+          <div class="card-header-flex" style="margin-bottom: 16px;">
+            <div>
+              <h3>Websites Visited Audit & Quick Moderation</h3>
+              <p class="card-desc">Detailed domain analytics and rule quick-actions</p>
+            </div>
+          </div>
+          <div id="optDomainAuditTable"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 3: CATEGORIES -->
+    <section class="tab-panel" id="tab-categories" role="tabpanel" hidden>
+      <div class="dashboard-section">
+        <h2 class="section-title">Browsing Activity Breakdown</h2>
+
+        <div class="card card-secondary">
+          <div class="card-header-flex">
+            <div>
+              <h3>Category Breakdown</h3>
+              <p class="card-desc">Distribution of time spent across activity types</p>
+            </div>
+          </div>
+          <div class="category-grid" id="optCategoryGrid"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 4: RULES -->
+    <section class="tab-panel" id="tab-rules" role="tabpanel" hidden>
+      <div class="dashboard-section">
+        <div class="panel-header">
+          <div>
+            <h2 class="section-title">Moderation Rules & Adherence</h2>
+            <p class="panel-desc">Monitors configured site limits and restraint rules.</p>
+          </div>
+          <button class="btn-primary btn-accent" id="optAddSiteBtn" type="button">+ New Moderation Rule</button>
+        </div>
+
+        <!-- Moderation Performance Summary -->
+        <div class="card card-secondary" style="margin-bottom: 24px;">
+          <h3>Moderation Performance Summary</h3>
+          <div class="mod-performance-grid">
+            <div class="perf-cell">
+              <div class="perf-val" id="optModLimitedCount">0</div>
+              <div class="perf-lbl">Limited Sites</div>
+            </div>
+            <div class="perf-cell">
+              <div class="perf-val" id="optModTrippedCount">0</div>
+              <div class="perf-lbl">Limits Triggered Today</div>
+            </div>
+            <div class="perf-cell">
+              <div class="perf-val positive" id="optModTimeSaved">0m</div>
+              <div class="perf-lbl">Est. Time Saved</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rule Adherence Streaks -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-header-flex">
+            <div>
+              <h3>Rule Adherence Streaks</h3>
+              <p class="card-desc">Consecutive days browsing within configured limits</p>
+            </div>
+          </div>
+          <div class="streaks-list" id="optStreaksList"></div>
+        </div>
+
+        <div class="filter-bar">
+          <input class="field search-field" id="siteSearchInput" placeholder="Filter moderation rules..." />
+          <div class="segmented filter-seg" id="filterModeSeg">
+            <button class="seg-btn active" data-filter="all">All Rules</button>
+            <button class="seg-btn" data-filter="limit">Time Limits</button>
+            <button class="seg-btn" data-filter="block">Full Blocks</button>
+          </div>
+        </div>
+
+        <div class="disciplines-grid" id="optDisciplinesGrid"></div>
+        <div class="empty-state" id="optEmptyState" hidden>
+          <p>No site moderation rules configured yet.</p>
+          <button class="btn-ghost" id="optCreateFirstBtn">Add your first moderation rule</button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 5: PREFERENCES & SYNC -->
+    <section class="tab-panel" id="tab-sync" role="tabpanel" hidden>
+      <div class="dashboard-section">
+        <h2 class="section-title">Storage & Synchronization</h2>
+
+        <div class="card settings-card">
+          <div class="settings-row-large">
+            <div class="settings-info">
+              <h3>Chrome Device Sync</h3>
+              <p>Sync your site disciplines across signed-in Chrome browsers using your Google account.</p>
+              <div class="sync-quota-badge">Chrome Sync Storage Limit: 8 KB per item</div>
+            </div>
+            <label class="switch" for="optSyncToggle">
+              <input type="checkbox" id="optSyncToggle" role="switch" aria-label="Toggle Chrome Sync" />
+              <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <div class="settings-note" id="optSyncNote" hidden></div>
+        </div>
+
+        <div class="card settings-card" style="margin-top: 16px;">
+          <h3>Appearance & Theme</h3>
+          <p class="card-desc">Choose your preferred visual theme across Stoic popups, dashboard, and moderation pages.</p>
+          
+          <div class="segmented" id="optThemeSeg" style="max-width: 380px; margin-top: 12px;">
+            <button class="seg-btn" data-value="light" type="button">Light</button>
+            <button class="seg-btn" data-value="dark" type="button">Dark</button>
+            <button class="seg-btn" data-value="system" type="button">System Auto</button>
+          </div>
+        </div>
+
+        <div class="card settings-card" style="margin-top: 16px;">
+          <h3>Default Action When Limit Reached</h3>
+          <p class="card-desc">Select what happens by default when your daily time allowance runs out on a site.</p>
+          
+          <div class="segmented" id="optDefaultActionSeg" style="max-width: 380px; margin-top: 12px;">
+            <button class="seg-btn active" data-value="page">Reality-Check Page</button>
+            <button class="seg-btn" data-value="redirect">Custom Redirect URL</button>
+          </div>
+
+          <div id="optGlobalRedirectRow" style="display:none; margin-top: 12px; max-width: 440px;">
+            <label for="optGlobalRedirectInput" class="field-label">Default Redirect URL</label>
+            <input class="field" id="optGlobalRedirectInput" placeholder="https://..." />
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TAB 6: BACKUP & IMPORT -->
+    <section class="tab-panel" id="tab-backup" role="tabpanel" hidden>
+      <div class="dashboard-section">
+        <h2 class="section-title">Backup & Restore</h2>
+
+        <div class="grid-2col">
+          <div class="card settings-card">
+            <h3>Export Settings</h3>
+            <p class="card-desc">Download a backup file containing all configured sites, limits, schedules, and preferences.</p>
+            <button class="btn-primary btn-accent" id="optExportBtn" type="button" style="margin-top: 14px;">Export Backup JSON</button>
+          </div>
+
+          <div class="card settings-card">
+            <h3>Import Settings</h3>
+            <p class="card-desc">Restore your Stoic configuration from a previously exported JSON backup file.</p>
+            <button class="btn-ghost" id="optImportBtn" type="button" style="margin-top: 14px;">Import Backup File</button>
+            <input type="file" id="optImportFile" accept="application/json" hidden />
+            <div class="settings-note" id="optImportNote" hidden></div>
+          </div>
+        </div>
+
+        <div class="card danger-card" style="margin-top: 24px;">
+          <h3>Danger Zone</h3>
+          <p>Permanently remove all site disciplines and clear usage history. This action cannot be undone.</p>
+          <button class="btn-danger" id="optResetAllBtn" type="button">Reset All Data & Clear History</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal for Creating / Editing Discipline -->
+  <dialog class="modal-dialog" id="optModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="optModalTitle">Configure Moderation Rule</h3>
+        <button class="modal-close" id="optModalCloseBtn" type="button">&times;</button>
+      </div>
+      <form id="optModalForm" class="modal-body" novalidate>
+        <label for="optModalDomain" class="field-label">Domain Name</label>
+        <input class="field" id="optModalDomain" placeholder="e.g. youtube.com" />
+        <div class="field-error" id="optModalDomainError" style="display:none;"></div>
+
+        <label class="field-label" style="margin-top: 10px;">Moderation Mode</label>
+        <div class="segmented" id="optModalModeSeg">
+          <button class="seg-btn active" type="button" data-value="limit">Time Limit</button>
+          <button class="seg-btn" type="button" data-value="block">Full Block</button>
+        </div>
+
+        <div id="optModalLimitRow" class="field-row" style="margin-top: 10px;">
+          <label for="optModalMinutes">Daily limit</label>
+          <input class="field" type="number" id="optModalMinutes" value="30" min="1" />
+          <span class="unit">min/day</span>
+        </div>
+
+        <details class="disclosure" style="margin: 14px 0 0 0;">
+          <summary>Schedule & Focus Hours</summary>
+          <div style="padding-top: 10px;">
+            <div class="section-label small" style="margin-left:0;">Active Days</div>
+            <div class="day-picker" id="optModalDayPicker">
+              <button class="day-btn active" type="button" data-day="1">M</button>
+              <button class="day-btn active" type="button" data-day="2">T</button>
+              <button class="day-btn active" type="button" data-day="3">W</button>
+              <button class="day-btn active" type="button" data-day="4">T</button>
+              <button class="day-btn active" type="button" data-day="5">F</button>
+              <button class="day-btn active" type="button" data-day="6">S</button>
+              <button class="day-btn active" type="button" data-day="0">S</button>
+            </div>
+
+            <div class="field-row time-row" style="margin-top: 12px;">
+              <label for="optModalStartTime">Focus hours</label>
+              <input class="field time-field" type="time" id="optModalStartTime" />
+              <span class="unit">to</span>
+              <input class="field time-field" type="time" id="optModalEndTime" />
+            </div>
+          </div>
+        </details>
+
+        <div class="modal-footer">
+          <button class="btn-ghost" type="button" id="optModalCancelBtn">Cancel</button>
+          <button class="btn-primary btn-accent" type="submit" id="optModalSaveBtn">Save Rule</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+</div>
+
+<script src="common.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "stoic-site-limiter",
+  "private": true,
+  "description": "Test/tooling manifest for the Stoic Chrome extension. Not used at runtime by the extension itself.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,172 @@
+/* ===== components.css — shared components =====
+   Defined once here, then reused across popup.html and blocked.html.
+   Pages compose these with a page-specific class for sizing/spacing
+   (e.g. a button is both ".btn-accent" for its look and ".btn-primary"
+   or ".btn-close" for its layout), rather than each page redefining the
+   same visual pattern from scratch.
+*/
+
+/* ---- buttons ---- */
+.btn-accent {
+  background: linear-gradient(180deg, var(--accent-soft), var(--accent));
+  color: var(--accent-ink);
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-family: var(--sans);
+  cursor: pointer;
+}
+.btn-accent:active { filter: brightness(0.94); }
+.btn-accent:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+.btn-ghost:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* ---- form fields ---- */
+.field {
+  width: 100%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-family: var(--sans);
+  margin-bottom: 8px;
+}
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.field::placeholder { color: var(--text-faint); }
+.field.has-error { border-color: var(--error-border); }
+.field-error {
+  color: var(--error);
+  font-size: 10.5px;
+  margin: -4px 0 8px 2px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.field-row label {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: none;
+  width: 70px;
+}
+.field-row .field { margin-bottom: 0; }
+.field-row .unit {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  flex: none;
+  font-family: var(--mono);
+}
+
+/* ---- segmented control ---- */
+.segmented {
+  display: flex;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 8px;
+}
+.seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-family: var(--sans);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 7px 4px;
+  border-radius: 6px;
+  transition: background .15s, color .15s;
+}
+.seg-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+.seg-btn.active { background: var(--accent-dim); color: var(--accent-soft); }
+
+/* ---- stat grid ----
+   A row of equal-width cells, each a big monospace value over a small
+   uppercase label. Used for the popup's dashboard and the blocked page's
+   usage summary — same shape, different data. */
+.stat-grid {
+  display: flex;
+  gap: 1px;
+  background: var(--border-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.stat-cell {
+  flex: 1;
+  background: var(--bg-panel);
+  padding: 10px 12px;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.stat-label {
+  font-size: 9.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 3px;
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
+/* ---- callout ----
+   A bordered panel with an accent left-edge, an uppercase label, and a
+   line of body text. Used for the blocked page's reality-check placard
+   and the popup's onboarding explainer. */
+.callout {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px 16px;
+  text-align: left;
+}
+.callout-label {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+  margin-bottom: 6px;
+}
+.callout-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+.callout-text + .callout-text { margin-top: 8px; }

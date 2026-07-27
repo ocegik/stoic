@@ -1,0 +1,374 @@
+/* ===== popup.css — Stoic Quick Glance Control Panel ===== */
+
+body {
+  width: 352px;
+  margin: 0;
+  padding: 0;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  gap: 18px;
+  box-sizing: border-box;
+}
+
+/* Header */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.brand-mark {
+  width: 25px;
+  height: 25px;
+  flex: none;
+}
+
+.brand-mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.brand-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Hero Overview: Today's Time & Daily Comparison & Circular Focus Score */
+.hero-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 2px;
+}
+
+.time-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hero-time-val {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.hero-time-lbl {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-faint);
+  letter-spacing: -0.01em;
+}
+
+.hero-time-comp {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.hero-time-comp.positive {
+  color: var(--sem-green-soft);
+}
+
+.hero-time-comp.negative {
+  color: var(--sem-amber-soft);
+}
+
+/* Circular Focus Score Gauge */
+.focus-gauge-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.focus-gauge-ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gauge-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.gauge-bg {
+  fill: none;
+  stroke: var(--bg-raised);
+  stroke-width: 4.5;
+}
+
+.gauge-fill {
+  fill: none;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+}
+
+.gauge-val {
+  position: absolute;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.gauge-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Top 3 Websites Section */
+.top-sites-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.section-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.top-sites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.site-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.site-favicon-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-raised);
+  flex: none;
+}
+
+.site-favicon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.favicon-fallback {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.site-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.progress-track {
+  height: 4.5px;
+  width: 100%;
+  background: var(--bg-raised);
+  border-radius: 2.5px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2.5px;
+  transition: width 0.3s ease;
+}
+
+.empty-state {
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 8px 0;
+}
+
+/* Compact Behaviour Summary */
+.behaviour-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  background: var(--bg-raised);
+  border-radius: 10px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  text-align: center;
+}
+
+.stat-val {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.stat-val.positive {
+  color: var(--sem-green-soft);
+}
+
+.stat-lbl {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-faint);
+  margin-top: 1px;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-soft);
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 9px;
+}
+
+.btn-action {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7.5px 12px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action svg {
+  width: 13.5px;
+  height: 13.5px;
+}
+
+.btn-action.primary {
+  background: var(--accent);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.btn-action.primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-action.secondary {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-soft);
+}
+
+.btn-action.secondary:hover {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
