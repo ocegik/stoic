@@ -74,12 +74,20 @@ function ensureReset(entry, today = getTodayKey()) {
 
   if (entry.usedSeconds > 0) {
     entry.history = entry.history || [];
-    entry.history.push({ date: entry.lastReset, seconds: entry.usedSeconds });
+    const record = { date: entry.lastReset, seconds: entry.usedSeconds };
+    // Carry the day's per-content watch-time attribution into the archive
+    // alongside its total, so a past day can still be broken down by
+    // category rather than collapsing to the generic domain rule.
+    if (entry.youtube && entry.youtube.date === entry.lastReset && entry.youtube.keys) {
+      record.youtube = entry.youtube.keys;
+    }
+    entry.history.push(record);
     if (entry.history.length > MAX_HISTORY_DAYS) {
       entry.history = entry.history.slice(entry.history.length - MAX_HISTORY_DAYS);
     }
   }
   entry.usedSeconds = 0;
+  entry.youtube = null;
   entry.lastReset = today;
   entry.notified80 = false;
   entry.notified90 = false;

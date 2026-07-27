@@ -153,6 +153,10 @@ function renderTopSites(browsing) {
 
 // Master Render Loop
 async function render() {
+  // Prime the YouTube stores before any analytics run: classification is
+  // synchronous, so an unprimed snapshot would score a productive
+  // channel's watch time as plain leisure for the first paint.
+  await ensureYouTubeStoresLoaded();
   const sites = await getSites();
   const today = todayStr();
 
@@ -221,7 +225,15 @@ async function renderDebugInfo() {
     const source = info.classification?.source || "domain_rule";
     if (dbgSource) dbgSource.textContent = source;
     if (debugBadgeSource) {
-      debugBadgeSource.textContent = source.includes("ai") ? "AI" : (source.includes("manual") ? "MANUAL" : (source.includes("channel") ? "Channel DB" : "Domain"));
+      const BADGE_BY_SOURCE = {
+        manual_video: "Video",
+        manual_channel: "Explicit",
+        builtin_channel: "Built-in",
+        user_override: "Your rule",
+        predicted_channel: "Predicted",
+        predicted_video: "Predicted",
+      };
+      debugBadgeSource.textContent = BADGE_BY_SOURCE[source] || "Domain";
     }
 
     if (dbgConfidence) {

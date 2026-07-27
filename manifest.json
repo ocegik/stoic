@@ -19,13 +19,13 @@
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/*", "*://youtube.com/*"],
-      "js": ["common.js", "youtube-content.js"],
+      "js": ["youtube-content.js"],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["options.html", "tokens.css", "components.css", "options.css", "common.js", "youtube-content.js", "options.js"],
+      "resources": ["options.html", "tokens.css", "components.css", "options.css", "common.js", "youtube-classifier.js", "youtube-content.js", "options.js"],
       "matches": ["<all_urls>"]
     }
   ],

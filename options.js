@@ -164,6 +164,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function loadData() {
+    // Classification is synchronous, so the YouTube stores must be in
+    // memory before anything renders analytics off them.
+    await ensureYouTubeStoresLoaded();
     sites = await getSites();
     storagePref = await getStoragePreference();
     const currentTheme = await getThemePreference();
@@ -218,6 +221,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderSyncSection();
     renderAnalytics(browsing);
     renderDisciplines(moderation);
+    // The debugger tab reads the same `sites` snapshot as everything above,
+    // so it re-renders here rather than through the wrapper-reassignment
+    // trick this file used to use.
+    renderYouTubeDebugTab().catch((err) =>
+      console.error("[Stoic] YouTube debugger render failed", err)
+    );
   }
 
   function renderOverviewTopWebsites(topWebsites) {
@@ -376,11 +385,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         <tbody>
     `;
 
-    const taxonomyGroups = {
-      Productivity: ["Study", "Coding", "AI & Chatbots", "Documentation", "Workplace & Ops", "Research & Reference"],
-      General: ["Email", "Shopping", "Banking & Finance", "News", "Search & Utilities", "General Browsing"],
-      Leisure: ["Social Media", "Streaming", "Gaming", "Entertainment", "Forums & Community", "Messaging"],
-    };
+    // Derived from the taxonomy in common.js rather than duplicated here,
+    // so adding a category in one place is enough.
+    const taxonomyGroups = selectableMicrosByMacro();
 
     browsing.topWebsites.forEach((item) => {
       const displayName = getDomainDisplayName(item.domain);
@@ -466,10 +473,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!currentSites[domain]) {
           currentSites[domain] = { mode: "unconstrained" };
         }
+        // microCategory/macroCategory are the stored pair; the legacy
+        // `category` field is still *read* for old profiles but no longer
+        // written, so there is only one place holding this state.
         currentSites[domain].microCategory = selectedMicro;
         currentSites[domain].macroCategory = selectedMacro;
-        currentSites[domain].category = selectedMicro;
+        delete currentSites[domain].category;
         await saveSites(currentSites);
+        invalidateClassificationCache();
+        sites = currentSites;
         renderAll();
       });
     });
@@ -859,110 +871,272 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // ---- Channel / video classification modal ----
+  // Replaces the old chain of window.prompt() calls, which accepted any
+  // free-text micro category and silently defaulted its macro — so a typo
+  // classified a channel as Productive.
+  const ytClassifyModal = document.getElementById("ytClassifyModal");
+  const ytClassifyForm = document.getElementById("ytClassifyForm");
+  const ytClassifyTitle = document.getElementById("ytClassifyTitle");
+  const ytClassifySubject = document.getElementById("ytClassifySubject");
+  const ytClassifyError = document.getElementById("ytClassifyError");
+  const ytClassifyHint = document.getElementById("ytClassifyHint");
+  const ytClassifyMacroSeg = document.getElementById("ytClassifyMacroSeg");
+  const ytClassifyMicro = document.getElementById("ytClassifyMicro");
+  const ytClassifyCloseBtn = document.getElementById("ytClassifyCloseBtn");
+  const ytClassifyCancelBtn = document.getElementById("ytClassifyCancelBtn");
+
+  // { kind: "channel" | "video", channelId, channelName, videoId }
+  let ytClassifyTarget = null;
+  let ytClassifyMacro = "General";
+
+  function fillMicroOptions(macro, selected) {
+    if (!ytClassifyMicro) return;
+    const groups = selectableMicrosByMacro();
+    const micros = groups[macro] || [];
+    ytClassifyMicro.innerHTML = micros
+      .map((m) => `<option value="${m}" ${m === selected ? "selected" : ""}>${m}</option>`)
+      .join("");
+    if (selected && !micros.includes(selected)) {
+      ytClassifyMicro.insertAdjacentHTML(
+        "beforeend",
+        `<option value="${selected}" selected>${selected} (custom)</option>`
+      );
+    }
+  }
+
+  function setClassifyMacro(macro, selectedMicro) {
+    ytClassifyMacro = MACRO_ORDER.includes(macro) ? macro : "General";
+    if (ytClassifyMacroSeg) {
+      ytClassifyMacroSeg.querySelectorAll(".seg-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.getAttribute("data-value") === ytClassifyMacro);
+      });
+    }
+    fillMicroOptions(ytClassifyMacro, selectedMicro);
+  }
+
+  wireSegmented(ytClassifyMacroSeg, (val) => setClassifyMacro(val));
+
+  function openClassifyModal(target) {
+    if (!ytClassifyModal) return;
+    ytClassifyTarget = target;
+    ytClassifyError.style.display = "none";
+    ytClassifyError.textContent = "";
+
+    if (target.kind === "video") {
+      ytClassifyTitle.textContent = "Classify Video";
+      ytClassifySubject.value = target.label || target.videoId;
+      ytClassifySubject.disabled = true;
+      ytClassifyHint.textContent =
+        "A video override applies to this one video only and outranks its channel's classification.";
+    } else {
+      ytClassifyTitle.textContent = target.channelId || target.channelName ? "Classify Channel" : "Add Channel";
+      ytClassifySubject.value = target.label || target.channelName || target.channelId || "";
+      ytClassifySubject.disabled = !!(target.channelId || target.channelName);
+      ytClassifyHint.textContent =
+        "An explicit classification is permanent: this channel always resolves to the category you choose, and prediction never runs for it again.";
+    }
+
+    setClassifyMacro(target.macro || "General", target.micro);
+    ytClassifyModal.showModal();
+  }
+
+  function closeClassifyModal() {
+    if (ytClassifyModal) ytClassifyModal.close();
+    ytClassifyTarget = null;
+  }
+
+  if (ytClassifyCloseBtn) ytClassifyCloseBtn.addEventListener("click", closeClassifyModal);
+  if (ytClassifyCancelBtn) ytClassifyCancelBtn.addEventListener("click", closeClassifyModal);
+
+  if (ytClassifyForm) {
+    ytClassifyForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!ytClassifyTarget) return closeClassifyModal();
+
+      const classification = { macro: ytClassifyMacro, micro: ytClassifyMicro.value };
+
+      if (ytClassifyTarget.kind === "video") {
+        await setVideoOverride(ytClassifyTarget.videoId, classification);
+      } else {
+        const typed = ytClassifySubject.value.trim();
+        const channelId = ytClassifyTarget.channelId || (/^UC[\w-]{6,}$/i.test(typed) ? typed : null);
+        const channelName = ytClassifyTarget.channelName || (channelId ? null : typed);
+        if (!channelId && !channelName) {
+          ytClassifyError.textContent = "Enter a channel name or channel ID.";
+          ytClassifyError.style.display = "block";
+          return;
+        }
+        await setChannelClassification({ channelId, channelName }, classification);
+      }
+
+      closeClassifyModal();
+      // A manual classification is authoritative everywhere, so re-render
+      // the analytics surfaces too, not just this tab.
+      await loadData();
+    });
+  }
+
   if (refreshDebugBtn) {
     refreshDebugBtn.addEventListener("click", () => renderYouTubeDebugTab());
   }
 
   if (resetChannelDbBtn) {
     resetChannelDbBtn.addEventListener("click", async () => {
-      if (confirm("Are you sure you want to clear all YouTube channel classifications?")) {
-        await saveChannelDatabase({});
-        renderYouTubeDebugTab();
+      if (confirm("Clear every YouTube channel classification, including the ones you set by hand?")) {
+        await clearChannelStore();
+        await loadData();
       }
     });
   }
 
   if (addChannelBtn) {
-    addChannelBtn.addEventListener("click", async () => {
-      const channelQuery = prompt("Enter YouTube Channel Name or Channel ID (e.g. Veritasium or UC12345):");
-      if (!channelQuery || !channelQuery.trim()) return;
+    addChannelBtn.addEventListener("click", () => openClassifyModal({ kind: "channel" }));
+  }
 
-      const microCategory = prompt("Enter Classification Micro Category for this channel (e.g. Study, Coding, Streaming, Gaming, News):", "Study");
-      if (!microCategory || !microCategory.trim()) return;
+  const SOURCE_BADGES = {
+    manual: { label: "EXPLICIT", color: "#a855f7", tint: "rgba(168, 85, 247, 0.12)" },
+    builtin: { label: "BUILT-IN", color: "#0d9488", tint: "rgba(13, 148, 136, 0.12)" },
+    predicted: { label: "PREDICTED", color: "#0284c7", tint: "rgba(2, 132, 199, 0.12)" },
+    unclassified: { label: "UNRESOLVED", color: "#f59e0b", tint: "rgba(245, 158, 11, 0.12)" },
+  };
 
-      const macroCategory = MICRO_TO_MACRO[microCategory.trim()] || "Productivity";
+  function sourceBadgeHtml(source) {
+    const badge = SOURCE_BADGES[source] || SOURCE_BADGES.predicted;
+    return `<span class="micro-badge" style="background:${badge.tint}; color:${badge.color}; border-color:${badge.tint};">${badge.label}</span>`;
+  }
 
-      await saveChannel({
-        channelId: channelQuery.trim(),
-        channelName: channelQuery.trim(),
-        classification: { macro: macroCategory, micro: microCategory.trim() },
-        confidence: 1.0,
-        reason: "Manual addition via Stoic Debugger",
-        source: "manual",
-      });
+  const TRACE_STEP_LABELS = {
+    video_override: "1 · Explicit video override",
+    explicit_channel: "2 · Explicit channel classification",
+    site_override: "3 · Category set on youtube.com",
+    predicted_channel: "4 · Predicted channel classification",
+    predicted_video: "5 · Prediction from this video's title",
+    domain_rule: "6 · Generic youtube.com rule",
+  };
 
-      renderYouTubeDebugTab();
-    });
+  const TRACE_STATUS_COLORS = {
+    hit: "var(--sem-green)",
+    miss: "var(--text-faint)",
+    skipped: "var(--text-faint)",
+    unclassified: "var(--sem-amber)",
+    fallthrough: "var(--text-muted)",
+  };
+
+  function renderTrace(trace) {
+    const el = document.getElementById("optDbgTrace");
+    if (!el) return;
+    if (!trace || trace.length === 0) {
+      el.innerHTML = `<li class="debug-trace-empty">Open a YouTube tab and refresh the inspector to see how its category was decided.</li>`;
+      return;
+    }
+    el.innerHTML = trace
+      .map((step) => {
+        const color = TRACE_STATUS_COLORS[step.status] || "var(--text-muted)";
+        return `
+          <li class="debug-trace-row">
+            <span class="debug-trace-step">${TRACE_STEP_LABELS[step.step] || step.step}</span>
+            <span class="debug-trace-status" style="color:${color};">${step.status.toUpperCase()}</span>
+            <span class="debug-trace-detail">${step.detail ? step.detail : ""}</span>
+          </li>`;
+      })
+      .join("");
+  }
+
+  function renderYtCategoryTotals() {
+    const el = document.getElementById("optYtCategoryTotals");
+    if (!el) return;
+    const totals = youtubeCategoryTotals(sites, todayStr());
+
+    if (!totals.totalSeconds) {
+      el.innerHTML = `<div class="yt-totals-empty">No YouTube time tracked today yet.</div>`;
+      return;
+    }
+
+    el.innerHTML = totals.segments
+      .map(
+        (seg) => `
+        <div class="yt-total-row">
+          <span class="macro-badge macro-${seg.macro.toLowerCase()}">${MACRO_CATEGORIES[seg.macro]?.label || seg.macro}</span>
+          <span class="yt-total-micro">${seg.micro}</span>
+          <div class="yt-total-bar"><div class="yt-total-fill" style="width:${Math.max(3, seg.pctOfTotal)}%;"></div></div>
+          <span class="yt-total-time">${fmtDuration(seg.seconds)}</span>
+          <span class="yt-total-pct">${seg.pctOfTotal}%</span>
+        </div>`
+      )
+      .join("");
   }
 
   async function renderYouTubeDebugTab() {
     await loadAndRenderAISettings();
-    // 1. Live Debug Inspector
+    await ensureYouTubeStoresLoaded();
+
+    // 1. Live inspector for the tab currently in front of the user.
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
       try {
         const info = await chrome.runtime.sendMessage({ type: "GET_CLASSIFICATION_DEBUG_INFO" });
         if (info) {
-          const optDbgVideoId = document.getElementById("optDbgVideoId");
-          const optDbgTitle = document.getElementById("optDbgTitle");
-          const optDbgChannel = document.getElementById("optDbgChannel");
-          const optDbgContentType = document.getElementById("optDbgContentType");
-          const optDbgChannelLookup = document.getElementById("optDbgChannelLookup");
-          const optDbgCacheStatus = document.getElementById("optDbgCacheStatus");
-          const optDbgSource = document.getElementById("optDbgSource");
-          const optDbgConfidence = document.getElementById("optDbgConfidence");
+          const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+          };
 
-          if (optDbgVideoId) optDbgVideoId.textContent = info.metadata?.videoId || "--";
-          if (optDbgTitle) optDbgTitle.textContent = info.metadata?.title || "--";
-          if (optDbgChannel) optDbgChannel.textContent = info.metadata?.channelName || info.metadata?.channelId || "--";
-          if (optDbgContentType) optDbgContentType.textContent = info.metadata?.contentType || "video";
+          setText("optDbgVideoId", info.metadata?.videoId || "--");
+          setText("optDbgTitle", info.metadata?.title || "--");
+          setText("optDbgChannel", info.metadata?.channelName || info.metadata?.channelId || "--");
+          setText("optDbgContentType", info.metadata?.contentType || "--");
+          setText("optDbgCacheStatus", info.cacheStatus || "MISS");
+          setText("optDbgSource", info.classification?.source || "domain_rule");
+          setText("optDbgAttribution", info.attributionKey || "--");
+          setText(
+            "optDbgConfidence",
+            `${Math.round((info.classification?.confidence ?? 0.8) * 100)}%`
+          );
 
-          if (optDbgChannelLookup) {
+          const cls = info.classification;
+          setText(
+            "optDbgCategory",
+            cls ? `${MACRO_CATEGORIES[cls.macro]?.label || cls.macro} · ${cls.micro}` : "--"
+          );
+
+          const lookupEl = document.getElementById("optDbgChannelLookup");
+          if (lookupEl) {
             if (info.channelLookup?.hit) {
-              const cls = info.channelLookup.channel?.classification;
-              optDbgChannelLookup.textContent = `HIT (${cls ? `${cls.macro}·${cls.micro}` : "Found"})`;
-              optDbgChannelLookup.style.color = "var(--sem-green)";
+              const c = info.channelLookup.channel?.classification;
+              lookupEl.textContent = `HIT (${c ? `${c.macro}·${c.micro}` : "found"})`;
+              lookupEl.style.color = "var(--sem-green)";
             } else {
-              optDbgChannelLookup.textContent = "MISS (Domain Fallback)";
-              optDbgChannelLookup.style.color = "var(--text-muted)";
+              lookupEl.textContent = "MISS (no stored channel)";
+              lookupEl.style.color = "var(--text-muted)";
             }
           }
 
-          if (optDbgCacheStatus) optDbgCacheStatus.textContent = info.cacheStatus || "MISS";
-          if (optDbgSource) optDbgSource.textContent = info.classification?.source || "domain_rule";
-          if (optDbgConfidence) {
-            const conf = Math.round((info.classification?.confidence || 0.8) * 100);
-            optDbgConfidence.textContent = `${conf}%`;
-          }
+          renderTrace(info.trace);
         }
       } catch {
-        /* Ignore background connection errors */
+        /* the service worker may be asleep; the tables below still render */
       }
     }
 
-    // 2. Channel Database (yt_channels) Table
+    // 2. Today's YouTube time by category — proof the classifications are
+    //    actually reaching analytics.
+    renderYtCategoryTotals();
+
+    // 3. Channel database.
     const channelsTableBody = document.getElementById("channelsTableBody");
     if (channelsTableBody) {
       channelsTableBody.innerHTML = "";
-      const channels = await getChannelDatabase();
-      const channelKeys = Object.keys(channels);
+      const channels = listChannels();
 
-      if (channelKeys.length === 0) {
-        channelsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No channel classifications saved yet in Channel Database. Click "+ Add / Classify Channel" above.</td></tr>`;
+      if (channels.length === 0) {
+        channelsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No channel classifications stored yet. Watch a YouTube video, or use “+ Add / Classify Channel”.</td></tr>`;
       } else {
-        const uniqueChannels = new Map();
-        Object.values(channels).forEach((c) => {
-          if (c && c.channelId) uniqueChannels.set(c.channelId, c);
-        });
-
-        uniqueChannels.forEach((channel) => {
+        channels.forEach((channel) => {
+          const cls = channel.classification || { macro: "General", micro: "Unclassified" };
           const row = document.createElement("tr");
-          const cls = channel.classification || { macro: "Leisure", micro: "Streaming" };
-          const confPct = Math.round((channel.confidence || 0.9) * 100);
+          const confPct = Math.round((channel.confidence ?? 0.9) * 100);
           const dateStr = channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : "--";
-
-          const isAI = channel.source === "ai" || channel.source === "ai_unclassified";
-          const srcBadge = isAI ? `<span class="micro-badge" style="background: rgba(2, 132, 199, 0.12); color: #0284c7; border-color: rgba(2, 132, 199, 0.25);">AI</span>` : `<span class="micro-badge" style="background: rgba(168, 85, 247, 0.12); color: #a855f7; border-color: rgba(168, 85, 247, 0.25);">MANUAL</span>`;
-          const reasonText = channel.reason || (isAI ? "AI classification" : "Manual user override");
+          const macroLabel = MACRO_CATEGORIES[cls.macro]?.label || cls.macro;
 
           row.innerHTML = `
             <td>
@@ -970,110 +1144,126 @@ document.addEventListener("DOMContentLoaded", async () => {
               <div style="font-size: 11px; color: var(--text-faint); font-family: var(--mono);">${channel.channelId}</div>
             </td>
             <td>
-              <span class="micro-badge">${cls.macro} · ${cls.micro}</span>
+              <span class="macro-badge macro-${cls.macro.toLowerCase()}">${macroLabel}</span>
+              <span class="micro-badge">${cls.micro}</span>
             </td>
             <td>
-              <div>${srcBadge}</div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 220px; word-break: break-word;">${reasonText}</div>
+              <div>${sourceBadgeHtml(channel.source)}${channel.pinned ? ` <span class="micro-badge" title="Explicit classifications are final — prediction never overwrites them.">PINNED</span>` : ""}</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 240px; word-break: break-word;">${channel.reason || "--"}</div>
             </td>
-            <td>
-              <span style="font-family: var(--mono); font-weight: 700;">${confPct}%</span>
-            </td>
+            <td><span style="font-family: var(--mono); font-weight: 700;">${confPct}%</span></td>
             <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
             <td>
-              <button class="btn-ghost reclass-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Reclassify channel via AI">AI Reclassify</button>
-              <button class="btn-ghost edit-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Manually override channel category">Override</button>
-              <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--sem-red);" title="Reset/Delete channel classification">Reset</button>
+              <button class="btn-ghost edit-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Set this channel's category permanently">Classify</button>
+              <button class="btn-ghost reclass-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Run the prediction system again for this channel">Re-predict</button>
+              <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--sem-red);" title="Forget this classification and let prediction decide again">Reset</button>
             </td>
           `;
 
+          row.querySelector(".edit-ch-btn").addEventListener("click", () =>
+            openClassifyModal({
+              kind: "channel",
+              channelId: channel.channelId,
+              channelName: channel.channelName,
+              label: channel.channelName || channel.channelId,
+              macro: cls.macro,
+              micro: cls.micro,
+            })
+          );
+
           const reclassBtn = row.querySelector(".reclass-ch-btn");
-          if (reclassBtn) {
-            reclassBtn.addEventListener("click", async () => {
-              reclassBtn.textContent = "Classifying...";
-              reclassBtn.disabled = true;
-              try {
-                await classifyUnknownChannel({ channelId: channel.channelId, channelName: channel.channelName }, { forceReclassify: true });
-                renderYouTubeDebugTab();
-              } catch (err) {
-                alert("Reclassification failed: " + err.message);
-              } finally {
-                reclassBtn.disabled = false;
-                reclassBtn.textContent = "AI Reclassify";
-              }
-            });
-          }
+          reclassBtn.addEventListener("click", async () => {
+            reclassBtn.disabled = true;
+            reclassBtn.textContent = "Predicting...";
+            try {
+              await predictChannelClassification(
+                { channelId: channel.channelId, channelName: channel.channelName },
+                { forceReclassify: true }
+              );
+              await loadData();
+            } catch (err) {
+              alert("Re-prediction failed: " + err.message);
+              reclassBtn.disabled = false;
+              reclassBtn.textContent = "Re-predict";
+            }
+          });
 
-          const editBtn = row.querySelector(".edit-ch-btn");
-          if (editBtn) {
-            editBtn.addEventListener("click", async () => {
-              const newMicro = prompt(`Enter manual micro category for ${channel.channelName || channel.channelId}:`, cls.micro);
-              if (!newMicro || !newMicro.trim()) return;
-              const newMacro = MICRO_TO_MACRO[newMicro.trim()] || "Productivity";
-              await saveChannel({
-                ...channel,
-                classification: { macro: newMacro, micro: newMicro.trim() },
-                confidence: 1.0,
-                reason: "Manual user override in Stoic Debugger",
-                source: "manual",
-                updatedAt: new Date().toISOString(),
-              });
-              renderYouTubeDebugTab();
-            });
-          }
-
-          const delBtn = row.querySelector(".del-ch-btn");
-          if (delBtn) {
-            delBtn.addEventListener("click", async () => {
-              if (confirm(`Remove ${channel.channelName || channel.channelId} from Channel Database?`)) {
-                const db = await getChannelDatabase();
-                delete db[channel.channelId];
-                if (channel.channelName) delete db[channel.channelName];
-                await saveChannelDatabase(db);
-                renderYouTubeDebugTab();
-              }
-            });
-          }
+          row.querySelector(".del-ch-btn").addEventListener("click", async () => {
+            if (confirm(`Forget the classification for ${channel.channelName || channel.channelId}?`)) {
+              await unpinChannel({ channelId: channel.channelId, channelName: channel.channelName });
+              await loadData();
+            }
+          });
 
           channelsTableBody.appendChild(row);
         });
       }
     }
 
-    // 3. Video Database (yt_videos) Table
+    // 4. Video log, showing the category each video actually resolves to.
     const videosTableBody = document.getElementById("videosTableBody");
     if (videosTableBody) {
       videosTableBody.innerHTML = "";
       const videos = await getVideoDatabase();
-      const videoList = Object.values(videos).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)).slice(0, 15);
+      const videoList = Object.values(videos)
+        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+        .slice(0, 15);
 
       if (videoList.length === 0) {
-        videosTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-faint); padding: 16px;">No video metadata extracted yet. Visit YouTube to see extracted videos here.</td></tr>`;
+        videosTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No video metadata extracted yet. Visit YouTube to populate this log.</td></tr>`;
       } else {
         videoList.forEach((v) => {
+          const { result } = explainYouTubeClassification(
+            {
+              domain: "youtube.com",
+              videoId: v.videoId,
+              channelId: v.channelId,
+              channelName: v.channelName,
+              title: v.title,
+            },
+            { sites }
+          );
+          const macroLabel = MACRO_CATEGORIES[result.macro]?.label || result.macro;
           const row = document.createElement("tr");
-          const dateStr = v.updatedAt ? new Date(v.updatedAt).toLocaleTimeString() : "--";
           row.innerHTML = `
             <td style="font-family: var(--mono); font-weight: 700; font-size: 11.5px;">${v.videoId}</td>
-            <td style="font-weight: 600; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${v.title || "--"}</td>
+            <td style="font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${v.title || ""}">${v.title || "--"}</td>
             <td>${v.channelName || v.channelId || "--"}</td>
-            <td><span class="micro-badge">${v.contentType || "video"}</span></td>
-            <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
+            <td>
+              <span class="macro-badge macro-${result.macro.toLowerCase()}">${macroLabel}</span>
+              <span class="micro-badge">${result.micro}</span>
+              <div style="font-size: 10.5px; color: var(--text-faint); margin-top: 2px;">${result.source}</div>
+            </td>
+            <td style="font-size: 11.5px; color: var(--text-muted);">${v.updatedAt ? new Date(v.updatedAt).toLocaleTimeString() : "--"}</td>
+            <td>
+              <button class="btn-ghost vid-override-btn" type="button" style="padding: 4px 8px; font-size: 11px;">Override</button>
+              ${v.override ? `<button class="btn-ghost vid-clear-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--sem-red);">Clear</button>` : ""}
+            </td>
           `;
+
+          row.querySelector(".vid-override-btn").addEventListener("click", () =>
+            openClassifyModal({
+              kind: "video",
+              videoId: v.videoId,
+              label: v.title || v.videoId,
+              macro: result.macro,
+              micro: result.micro,
+            })
+          );
+
+          const clearBtn = row.querySelector(".vid-clear-btn");
+          if (clearBtn) {
+            clearBtn.addEventListener("click", async () => {
+              await setVideoOverride(v.videoId, null);
+              await loadData();
+            });
+          }
+
           videosTableBody.appendChild(row);
         });
       }
     }
   }
 
-  // Include in tab navigation and periodic refresh
-  const origRenderAll = renderAll;
-  renderAll = function() {
-    if (typeof origRenderAll === "function") origRenderAll();
-    renderYouTubeDebugTab();
-  };
-
   loadData();
-  renderYouTubeDebugTab();
 });
-

@@ -23,9 +23,12 @@
 // todayStr()/getSites()/saveSites() live in common.js; the pure,
 // storage-free tracking logic (ensureReset, matchSite, elapsed-time
 // clamping, threshold checks) lives in background-logic.js so the test
-// suite can exercise it without a Chrome environment. Service workers
-// can't use <script> tags, so pull both in with importScripts.
-importScripts("common.js", "background-logic.js");
+// suite can exercise it without a Chrome environment; the whole YouTube
+// classification subsystem lives in youtube-classifier.js, which must load
+// after common.js because it builds on the classification framework there.
+// Service workers can't use <script> tags, so pull them in with
+// importScripts.
+importScripts("common.js", "youtube-classifier.js", "background-logic.js");
 
 const TICK_ALARM = "site-limiter-tick";
 
@@ -168,8 +171,22 @@ async function tick() {
   const entry = sites[key];
   const rolledOver = ensureReset(entry);
 
+  // Single place that credits elapsed time, so the plain counter and the
+  // per-content attribution can never diverge. For YouTube the seconds are
+  // additionally booked against the video (or channel) actually on screen;
+  // the category is resolved later, at read time, which is what lets a
+  // re-classification retroactively correct today's analytics.
+  const creditUsage = (seconds) => {
+    if (!(seconds > 0)) return;
+    entry.usedSeconds = (entry.usedSeconds || 0) + seconds;
+    if (isYouTubeDomain(current.domain)) {
+      const meta = latestYouTubeMetadataByTab[current.tabId] || null;
+      creditYouTubeSeconds(entry, attributionKeyForContext(meta), seconds, todayStr());
+    }
+  };
+
   if (entry.mode === "unconstrained") {
-    entry.usedSeconds = (entry.usedSeconds || 0) + elapsedSeconds;
+    creditUsage(elapsedSeconds);
     await saveSites(sites);
     return;
   }
@@ -190,10 +207,10 @@ async function tick() {
     if (!hasPass) {
       tripReason = "restraint";
     } else {
-      entry.usedSeconds = (entry.usedSeconds || 0) + elapsedSeconds;
+      creditUsage(elapsedSeconds);
     }
   } else if (entry.mode === "limit") {
-    entry.usedSeconds = (entry.usedSeconds || 0) + elapsedSeconds;
+    creditUsage(elapsedSeconds);
     const limitSeconds = (activeRule.limitMinutes || 0) * 60;
 
     const crossed = crossedThreshold(entry, limitSeconds);
@@ -246,9 +263,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = sender.tab?.id || activeState.tabId;
     if (tabId && message.metadata) {
       latestYouTubeMetadataByTab[tabId] = message.metadata;
-      recordYouTubeVisit(message.metadata).then(() => {
-        runTick();
-      }).catch((err) => console.error("[Stoic] recordYouTubeVisit failed", err));
+      recordYouTubeVisit(message.metadata)
+        .then(() => runTick())
+        .catch((err) => console.error("[Stoic] recordYouTubeVisit failed", err));
     }
     sendResponse({ success: true });
     return true;
@@ -260,38 +277,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true; // async response
   }
-
-  if (message.type === "RECLASSIFY_CHANNEL") {
-    classifyUnknownChannel(message.metadata || { channelId: message.channelId, channelName: message.channelName }, { forceReclassify: true })
-      .then((updated) => {
-        runTick();
-        sendResponse({ success: true, channel: updated });
-      })
-      .catch((err) => sendResponse({ error: err.message }));
-    return true;
-  }
-
-  if (message.type === "MANUAL_OVERRIDE_CHANNEL") {
-    saveChannel({
-      channelId: message.channelId,
-      channelName: message.channelName,
-      classification: message.classification,
-      confidence: 1.0,
-      reason: "Manual user override in Stoic Debugger",
-      source: "manual",
-      updatedAt: new Date().toISOString(),
-    })
-      .then((updated) => {
-        runTick();
-        sendResponse({ success: true, channel: updated });
-      })
-      .catch((err) => sendResponse({ error: err.message }));
-    return true;
-  }
 });
 
+// Everything the YouTube debugger needs about the tab currently in front of
+// the user: what was extracted, which store lookups hit, and — most
+// usefully when something looks wrong — the ordered trace of which
+// precedence step produced the answer and why the earlier ones did not.
 async function handleGetDebugInfo() {
+  await ensureYouTubeStoresLoaded();
   const current = await resolveActiveTab();
+  const sites = await getSites();
+
   if (!current.tabId || !current.domain) {
     return {
       domain: current.domain || null,
@@ -299,6 +295,8 @@ async function handleGetDebugInfo() {
       metadata: null,
       channelLookup: { hit: false, channel: null },
       cacheStatus: "MISS",
+      trace: [],
+      attributionKey: null,
       classification: { macro: "General", micro: "General Browsing", confidence: 0.5, source: "fallback" },
     };
   }
@@ -308,25 +306,42 @@ async function handleGetDebugInfo() {
     const tab = await chrome.tabs.get(current.tabId);
     tabUrl = tab.url;
   } catch {
-    /* ignore */
+    /* the tab may have closed between resolving and reading it */
   }
 
   const ytMeta = latestYouTubeMetadataByTab[current.tabId] || null;
   const contextInput = ytMeta || { domain: current.domain, url: tabUrl };
 
+  // Extract once and classify from the extracted context, rather than
+  // extracting a second time inside classifyContext().
   const context = defaultExtractorRegistry.extract(contextInput);
-  const sites = await getSites();
-  const cached = defaultClassificationCache.get(contextInput, sites);
-  const cacheStatus = cached ? "HIT" : "MISS";
-
-  const result = await classifyContextAsync(contextInput, sites);
+  const cacheStatus = defaultClassificationCache.get(context, sites) ? "HIT" : "MISS";
+  const result = classifyContext(context, sites);
 
   let channelLookup = { hit: false, channel: null };
-  const query = context.channelId || context.channelName;
-  if (query) {
-    const found = await getChannel(query);
-    if (found) {
-      channelLookup = { hit: true, channel: found };
+  let trace = [];
+  let attributionKey = null;
+
+  if (isYouTubeDomain(context.domain)) {
+    attributionKey = attributionKeyForContext(context);
+    trace = resolveYouTubeClassification(
+      {
+        domain: context.domain,
+        videoId: context.videoId,
+        channelId: context.channelId,
+        channelName: context.channelName,
+        title: context.title,
+        contentType: context.contentType,
+      },
+      { sites }
+    ).trace;
+
+    const query = context.channelId || context.channelName;
+    if (query) {
+      const found =
+        lookupChannelSync({ channelId: context.channelId, channelName: context.channelName }) ||
+        lookupBuiltInChannel({ channelId: context.channelId, channelName: context.channelName });
+      if (found) channelLookup = { hit: true, channel: found };
     }
   }
 
@@ -342,6 +357,8 @@ async function handleGetDebugInfo() {
     },
     channelLookup,
     cacheStatus,
+    trace,
+    attributionKey,
     classification: result.toObject(),
   };
 }
@@ -355,12 +372,26 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.tabs.onActivated.addListener(() => runTick());
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.url) runTick();
+  if (!changeInfo.url) return;
+  // A tab that has left YouTube must stop carrying its last video's
+  // metadata around, or the next tick would keep attributing time to a
+  // video that is no longer on screen (and the map would grow forever).
+  if (!isYouTubeDomain(getDomain(changeInfo.url) || "")) {
+    delete latestYouTubeMetadataByTab[tabId];
+  }
+  runTick();
 });
 chrome.tabs.onRemoved.addListener((tabId) => {
   removeRestraintPassForTab(tabId);
+  delete latestYouTubeMetadataByTab[tabId];
 });
 chrome.windows.onFocusChanged.addListener(() => runTick());
+
+// Prime the YouTube stores so the very first tick after the worker wakes
+// classifies against real data instead of an empty snapshot.
+ensureYouTubeStoresLoaded()
+  .catch((err) => console.error("[Stoic] priming YouTube stores failed", err))
+  .finally(() => runTick());
 
 runTick();
 

@@ -65,10 +65,38 @@ actually make you close the tab.
 ## Project structure
 
 - `common.js` — shared helpers (`todayStr`, `getSites`/`saveSites`,
-  `fmtMinutes`, schedule helpers, weekly usage, streak calculation) used
-  by `background.js`, `popup.js`, and `blocked.js`. Loaded via
-  `<script>` in the two HTML pages and via `importScripts()` in the
-  background service worker.
+  `fmtMinutes`, schedule helpers, weekly usage, streak calculation), the
+  category taxonomy, and the generic classification framework
+  (extractors, the rule pipeline, analytics). Loaded via `<script>` in the
+  HTML pages and via `importScripts()` in the background service worker.
+- `youtube-classifier.js` — the YouTube classification domain service:
+  channel database, per-video database, prediction providers, the
+  precedence chain, and watch-time attribution. It plugs into `common.js`
+  through `registerClassifierRule` / `registerContentService`, so the
+  dependency only points one way and `common.js` stays platform-agnostic.
+  Must load *after* `common.js`.
+
+### YouTube classification precedence
+
+Every watched video resolves to exactly one category — Productive,
+General Browsing, or Leisure — through a single chain in
+`resolveYouTubeClassification()`:
+
+1. **Explicit video override** — the user classified that exact video.
+2. **Explicit channel classification** — the user pinned the channel, or
+   it is in the shipped `BUILT_IN_CHANNEL_CLASSIFICATIONS` table. This is
+   final: no prediction runs for a pinned channel.
+3. **Site-level override** — a category set on `youtube.com` itself.
+4. **Predicted channel classification** — the prediction system's settled
+   answer for the channel.
+5. **Prediction from the video's own title** — for a channel that is new
+   or that the predictor could not resolve.
+6. **Generic `youtube.com` domain rule** — Leisure · Streaming.
+
+Watch time is credited per video (not per category) and the category is
+resolved at read time, so re-classifying a channel retroactively corrects
+the day's focus score and analytics rather than only affecting what you
+watch next.
 - `tokens.css` — color/type variables and the handful of resets every
   surface needs.
 - `components.css` — shared UI pieces (buttons, form fields, the

@@ -370,6 +370,30 @@
               <div class="debug-card-lbl">Confidence Score</div>
               <div class="debug-card-val" id="optDbgConfidence">80%</div>
             </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Resolved Category</div>
+              <div class="debug-card-val" id="optDbgCategory">--</div>
+            </div>
+            <div class="yt-debug-card">
+              <div class="debug-card-lbl">Time Attributed To</div>
+              <div class="debug-card-val" id="optDbgAttribution">--</div>
+            </div>
+          </div>
+
+          <div class="debug-trace-block">
+            <div class="debug-card-lbl" style="margin-bottom: 8px;">Precedence Chain</div>
+            <ol class="debug-trace" id="optDbgTrace">
+              <li class="debug-trace-empty">Open a YouTube tab and refresh the inspector to see how its category was decided.</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Downstream propagation: today's YouTube time by category -->
+        <div class="card settings-card" style="margin-bottom: 20px;">
+          <h3>Today's YouTube Time by Category</h3>
+          <p class="card-desc">How this subsystem's classifications are actually being counted in your focus score and analytics right now.</p>
+          <div id="optYtCategoryTotals" class="yt-category-totals">
+            <div class="yt-totals-empty">No YouTube time tracked today yet.</div>
           </div>
         </div>
 
@@ -445,7 +469,7 @@
                 <tr>
                   <th>Channel ID / Name</th>
                   <th>Classification</th>
-                  <th>Source & Rationale</th>
+                  <th>Authority & Rationale</th>
                   <th>Confidence</th>
                   <th>Last Updated</th>
                   <th>Actions</th>
@@ -469,8 +493,9 @@
                   <th>Video ID</th>
                   <th>Title</th>
                   <th>Channel</th>
-                  <th>Type</th>
+                  <th>Resolved Category</th>
                   <th>Extracted At</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="videosTableBody">
@@ -483,6 +508,42 @@
     </section>
 
   </main>
+
+  <!-- Modal for classifying a YouTube channel or an individual video -->
+  <dialog class="modal-dialog" id="ytClassifyModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="ytClassifyTitle">Classify Channel</h3>
+        <button class="modal-close" id="ytClassifyCloseBtn" type="button">&times;</button>
+      </div>
+      <form id="ytClassifyForm" class="modal-body" novalidate>
+        <label for="ytClassifySubject" class="field-label">Channel name or ID</label>
+        <input class="field" id="ytClassifySubject" placeholder="e.g. Veritasium or UCHnyfMqiRRG1u-2MsSQLbXA" />
+        <div class="field-error" id="ytClassifyError" style="display:none;"></div>
+        <div class="field-hint" id="ytClassifyHint">
+          An explicit classification is permanent: this channel always resolves to the
+          category you choose, and prediction never runs for it again.
+        </div>
+
+        <label class="field-label" style="margin-top: 14px;">Category</label>
+        <div class="segmented" id="ytClassifyMacroSeg">
+          <button class="seg-btn" type="button" data-value="Productivity">Productive</button>
+          <button class="seg-btn active" type="button" data-value="General">General Browsing</button>
+          <button class="seg-btn" type="button" data-value="Leisure">Leisure</button>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <label for="ytClassifyMicro" class="field-label">Sub-category</label>
+          <select class="field" id="ytClassifyMicro"></select>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-ghost" type="button" id="ytClassifyCancelBtn">Cancel</button>
+          <button class="btn-primary btn-accent" type="submit">Save Classification</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
 
   <!-- Modal for Creating / Editing Discipline -->
   <dialog class="modal-dialog" id="optModal">
@@ -562,6 +623,7 @@
 </div>
 
 <script src="common.js"></script>
+<script src="youtube-classifier.js"></script>
 <script src="options.js"></script>
 </body>
 </html>

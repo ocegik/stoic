@@ -4,8 +4,17 @@
 // yt-page-data-updated, DOM mutations) to keep metadata updated live.
 
 (function () {
+  // Longest we will let the debounce below defer a broadcast. YouTube
+  // mutates the DOM more or less continuously (view counts, comments, live
+  // chat), and a plain trailing debounce can be starved indefinitely by
+  // that — which used to mean a video's metadata sometimes never reached
+  // the background worker at all, so its watch time was attributed to
+  // nothing in particular.
+  const MAX_UPDATE_DELAY_MS = 2000;
+
   let lastMetadataHash = "";
   let updateTimer = null;
+  let firstPendingAt = 0;
 
   function extractVideoId(urlObj) {
     if (urlObj.hostname.includes("youtu.be")) {
@@ -143,11 +152,23 @@
     }
   }
 
+  function runUpdate() {
+    updateTimer = null;
+    firstPendingAt = 0;
+    broadcastMetadata();
+  }
+
   function scheduleUpdate(delay = 300) {
+    const now = Date.now();
+    if (!firstPendingAt) firstPendingAt = now;
+
+    // Cap how far the trailing edge can slide, so a steady stream of
+    // mutations still gets a broadcast every MAX_UPDATE_DELAY_MS.
+    const deadline = firstPendingAt + MAX_UPDATE_DELAY_MS;
+    const fireAt = Math.min(now + delay, deadline);
+
     if (updateTimer) clearTimeout(updateTimer);
-    updateTimer = setTimeout(() => {
-      broadcastMetadata();
-    }, delay);
+    updateTimer = setTimeout(runUpdate, Math.max(0, fireAt - now));
   }
 
   // SPA Event Listeners
@@ -156,11 +177,26 @@
   window.addEventListener("popstate", () => scheduleUpdate(100));
   window.addEventListener("hashchange", () => scheduleUpdate(100));
 
-  // DOM MutationObserver for dynamic element loading (title, channel elements)
+  // Watch the document title only. The previous version fell back to
+  // observing the entire documentElement subtree (including characterData)
+  // whenever <title> had not been parsed yet, which on YouTube means being
+  // woken by essentially every DOM change on the page.
   const observer = new MutationObserver(() => scheduleUpdate(300));
-  const target = document.querySelector("title") || document.documentElement;
-  if (target) {
-    observer.observe(target, { childList: true, subtree: true, characterData: true });
+  function observeTitle() {
+    const titleEl = document.querySelector("title");
+    if (titleEl) {
+      observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+      return true;
+    }
+    return false;
+  }
+  if (!observeTitle() && document.head) {
+    // <title> not there yet: watch just <head> until it appears.
+    const headObserver = new MutationObserver(() => {
+      if (observeTitle()) headObserver.disconnect();
+      scheduleUpdate(300);
+    });
+    headObserver.observe(document.head, { childList: true });
   }
 
   // Initial Extraction

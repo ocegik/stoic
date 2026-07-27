@@ -475,10 +475,22 @@ function getTopSitesToday(sites, today = todayStr()) {
   }));
 }
 
+// The three categories every tracked second ultimately lands in. `label`
+// is what surfaces to the user; `weight` is the single definition of how
+// much each category counts toward the focus score.
 const MACRO_CATEGORIES = {
-  Productivity: { name: "Productivity", weight: 1.0, badgeClass: "macro-productivity" },
-  General: { name: "General", weight: 0.6, badgeClass: "macro-general" },
-  Leisure: { name: "Leisure", weight: 0.1, badgeClass: "macro-leisure" },
+  Productivity: { name: "Productivity", label: "Productive", weight: 1.0, badgeClass: "macro-productivity" },
+  General: { name: "General", label: "General Browsing", weight: 0.6, badgeClass: "macro-general" },
+  Leisure: { name: "Leisure", label: "Leisure", weight: 0.1, badgeClass: "macro-leisure" },
+};
+
+const MACRO_ORDER = ["Productivity", "General", "Leisure"];
+
+// Where a classification lands when only the macro category is known.
+const DEFAULT_MICRO_FOR_MACRO = {
+  Productivity: "Study",
+  General: "General Browsing",
+  Leisure: "Streaming",
 };
 
 const MICRO_CATEGORIES = {
@@ -505,12 +517,35 @@ const MICRO_CATEGORIES = {
   "Entertainment": { name: "Entertainment", macro: "Leisure" },
   "Forums & Community": { name: "Forums & Community", macro: "Leisure" },
   "Messaging": { name: "Messaging", macro: "Leisure" },
+
+  // System bucket. Not user-selectable — it is what a prediction resolves
+  // to when it was not confident enough to commit to a real category, and
+  // it exists here so it always maps to a valid macro rather than falling
+  // through MICRO_TO_MACRO as undefined.
+  "Unclassified": { name: "Unclassified", macro: "General", system: true },
 };
 
 const MICRO_TO_MACRO = Object.keys(MICRO_CATEGORIES).reduce((acc, micro) => {
   acc[micro] = MICRO_CATEGORIES[micro].macro;
   return acc;
 }, {});
+
+// The micro categories a user can pick, grouped by macro. Derived from the
+// taxonomy above so the pickers in the options page can never drift out of
+// sync with it.
+function selectableMicrosByMacro() {
+  const groups = {};
+  MACRO_ORDER.forEach((macro) => {
+    groups[macro] = [];
+  });
+  Object.keys(MICRO_CATEGORIES).forEach((micro) => {
+    const def = MICRO_CATEGORIES[micro];
+    if (def.system) return;
+    if (!groups[def.macro]) groups[def.macro] = [];
+    groups[def.macro].push(micro);
+  });
+  return groups;
+}
 
 // ---------- Content-Aware Classification Architecture ----------
 
@@ -906,57 +941,6 @@ class ContentExtractorClassifierRule extends ClassifierRule {
   }
 }
 
-class ChannelClassifierRule extends ClassifierRule {
-  constructor() {
-    super("channel_database");
-  }
-
-  classify(context, sites = null) {
-    if (!context) return null;
-    const d = context.domain;
-    const isYouTube = d === "youtube.com" || d.endsWith(".youtube.com") || d === "youtu.be";
-    if (!isYouTube) return null;
-
-    const channelId = context.channelId || (context.metadata ? context.metadata.channelId : null);
-    const channelName = context.channelName || (context.metadata ? context.metadata.channelName : null);
-
-    const channelDb = (context.metadata && context.metadata.channelDb)
-      ? context.metadata.channelDb
-      : (sites && sites._yt_channels ? sites._yt_channels : null);
-
-    let matchedChannel = null;
-    if (channelDb && typeof channelDb === "object") {
-      if (channelId && channelDb[channelId]) {
-        matchedChannel = channelDb[channelId];
-      } else if (channelName) {
-        matchedChannel = Object.values(channelDb).find(
-          (c) => c && c.channelName && c.channelName.toLowerCase() === String(channelName).toLowerCase()
-        );
-      }
-    }
-
-    if (matchedChannel && matchedChannel.classification && matchedChannel.classification.micro && matchedChannel.classification.micro !== "Unclassified") {
-      const micro = matchedChannel.classification.micro;
-      const macro = matchedChannel.classification.macro || MICRO_TO_MACRO[micro] || "General";
-      return new ClassificationResult({
-        macro,
-        micro,
-        confidence: Number(matchedChannel.confidence) || 0.9,
-        source: matchedChannel.source === "ai" ? "ai_channel_database" : (matchedChannel.source === "manual" ? "manual_channel_database" : "channel_database"),
-        metadata: {
-          channelId: matchedChannel.channelId || channelId,
-          channelName: matchedChannel.channelName || channelName,
-          reason: matchedChannel.reason || null,
-          source: matchedChannel.source || "channel_database",
-          updatedAt: matchedChannel.updatedAt || null,
-        },
-      });
-    }
-
-    return null;
-  }
-}
-
 class DomainRuleClassifierRule extends ClassifierRule {
   constructor() {
     super("domain_rule");
@@ -1038,20 +1022,49 @@ class FallbackClassifierRule extends ClassifierRule {
   }
 }
 
+// Ordered chain of rules; the first one to return a result wins.
+//
+// Rules carry an explicit priority (lower runs earlier) so a platform
+// module loaded later — youtube-classifier.js registers itself at priority
+// 10 — can slot itself into the right place in the chain instead of the
+// order depending on which file happened to load first. Rules added
+// without a priority keep plain insertion order among their peers.
+const RULE_PRIORITY = {
+  PLATFORM_EXPLICIT: 10,
+  USER_OVERRIDE: 20,
+  CONTENT_EXTRACTOR: 30,
+  PLATFORM_PREDICTION: 40,
+  DOMAIN_RULE: 50,
+  FALLBACK: 90,
+};
+
 class ClassificationPipeline {
   constructor() {
     this.rules = [];
   }
 
-  addRule(rule) {
-    if (rule && typeof rule.classify === "function") {
-      this.rules.push(rule);
+  addRule(rule, priority = RULE_PRIORITY.DOMAIN_RULE) {
+    if (!rule || typeof rule.classify !== "function") return;
+    const entry = { rule, priority };
+    // Insert after every rule of equal-or-lower priority, which keeps
+    // insertion order stable within a priority band.
+    let index = this.rules.length;
+    for (let i = 0; i < this.rules.length; i++) {
+      if (this.rules[i].priority > priority) {
+        index = i;
+        break;
+      }
     }
+    this.rules.splice(index, 0, entry);
+  }
+
+  get orderedRules() {
+    return this.rules.map((r) => r.rule);
   }
 
   classify(context, sites = null) {
     const ctx = ClassificationContext.create(context);
-    for (const rule of this.rules) {
+    for (const { rule } of this.rules) {
       const result = rule.classify(ctx, sites);
       if (result) {
         return result;
@@ -1066,6 +1079,30 @@ class ClassificationPipeline {
   }
 }
 
+// ---------- classification epoch ----------
+// Bumped whenever anything a classification could depend on changes: the
+// user's per-site categories, the YouTube channel database, the per-video
+// overrides. Cache keys embed the current epoch, so a single bump retires
+// every cached answer at once.
+//
+// This replaces hashing the entire `sites` map into every cache key, which
+// was both expensive (a full JSON.stringify per lookup, and analytics does
+// one lookup per tracked domain per render) and self-defeating: usedSeconds
+// changes on every tick, so the key changed constantly and the cache
+// effectively never hit.
+let classificationEpoch = 0;
+
+function invalidateClassificationCache() {
+  classificationEpoch++;
+  if (typeof defaultClassificationCache !== "undefined" && defaultClassificationCache) {
+    defaultClassificationCache.clear();
+  }
+}
+
+function getClassificationEpoch() {
+  return classificationEpoch;
+}
+
 // Caching Layer
 class ClassificationCache {
   constructor(maxSize = 500, ttlMs = 5 * 60 * 1000) {
@@ -1074,10 +1111,20 @@ class ClassificationCache {
     this.ttlMs = ttlMs;
   }
 
+  // The key is the classification *identity* of the request — the fields any
+  // rule can actually branch on — plus the epoch.
   makeKey(context, sites = null) {
     const ctx = ClassificationContext.create(context);
-    const sitesHash = sites ? JSON.stringify(sites) : "no_sites";
-    return ctx.url ? `url:${ctx.url}::${sitesHash}` : `domain:${ctx.domain}::${sitesHash}`;
+    const identity = [
+      ctx.url || "",
+      ctx.domain || "",
+      ctx.videoId || "",
+      ctx.channelId || "",
+      ctx.channelName || "",
+      ctx.title || "",
+      sites ? "sites" : "no_sites",
+    ].join("::");
+    return `e${classificationEpoch}::${identity}`;
   }
 
   get(context, sites = null) {
@@ -1108,443 +1155,6 @@ class ClassificationCache {
   }
 }
 
-// ---------- AI Classifier Provider Architecture ----------
-
-class BaseAIClassifierProvider {
-  constructor(name = "base") {
-    this.name = name;
-  }
-
-  async classifyChannel(channelInfo) {
-    return null;
-  }
-}
-
-class HeuristicAIClassifierProvider extends BaseAIClassifierProvider {
-  constructor() {
-    super("heuristic_ai");
-  }
-
-  async classifyChannel(channelInfo) {
-    const name = String(channelInfo.channelName || channelInfo.channelId || "").toLowerCase();
-    const primaryTitle = String(channelInfo.videoTitle || channelInfo.title || "").toLowerCase();
-    const extraTitles = Array.isArray(channelInfo.videoTitles) ? channelInfo.videoTitles.map((t) => String(t).toLowerCase()) : [];
-    const allTitles = [primaryTitle, ...extraTitles].filter(Boolean);
-    const combined = `${name} ${allTitles.join(" ")}`;
-
-    let micro = null;
-    let reason = "Heuristic keyword analysis";
-    let confidence = 0.85;
-
-    // 1. Coding / Software Development (checked before general study so tech tutorials classify as Coding)
-    if (/code|coding|programmer|programming|developer|dev|javascript|python|react|node|rust|c\+\+|java|github|leetcode|framework|html|css|webdev|fireship|traversy|freecodecamp/i.test(combined)) {
-      micro = "Coding";
-      reason = "Software development, programming, or coding keywords detected";
-      confidence = 0.92;
-    }
-    // 2. Study / Education
-    else if (/coursera|udemy|edx|lecture|course|tutorial|learn|university|academy|math|physics|algebra|calculus|geometry|biology|chemistry|science|history|philosophy|khan|veritasium|31415|3blue1brown|numberphile|mit|stanford|harvard|pw\.live|physicswallah/i.test(combined)) {
-      micro = "Study";
-      reason = "Educational, academic, or tutorial keywords detected in channel/video context";
-      confidence = 0.90;
-    }
-    // 3. AI & Chatbots
-    else if (/chatgpt|openai|llm|ai news|artificial intelligence|machine learning|deep learning|prompt|gpt-4|claude|gemini/i.test(combined)) {
-      micro = "AI & Chatbots";
-      reason = "Artificial intelligence or LLM topics detected";
-      confidence = 0.88;
-    }
-    // 4. Research & Reference
-    else if (/paper|arxiv|research|documentary|TED|tedx|essay|analysis|deep dive|explainer/i.test(combined)) {
-      micro = "Research & Reference";
-      reason = "Research, documentary, or analytical content keywords detected";
-      confidence = 0.85;
-    }
-    // 5. News & Current Events
-    else if (/news|daily|report|politics|breaking|bulletin|bbc|cnn|reuters|journal|vox/i.test(combined)) {
-      micro = "News";
-      reason = "News, reporting, or current events topics detected";
-      confidence = 0.88;
-    }
-    // 6. Gaming
-    else if (/gameplay|walkthrough|playthrough|ign|nintendo|playstation|xbox|minecraft|roblox|fortnite|esports|speedrun|twitch/i.test(combined)) {
-      micro = "Gaming";
-      reason = "Gaming, walkthrough, or esports keywords detected";
-      confidence = 0.90;
-    }
-    // 7. Streaming / Entertainment
-    else if (/vlog|music|official video|trailer|movie|show|comedy|sketch|reaction|funny|highlights|podcast|clip|entertainment/i.test(combined)) {
-      micro = "Streaming";
-      reason = "General entertainment, music, or vlog content detected";
-      confidence = 0.85;
-    }
-
-    if (micro) {
-      const macro = MICRO_TO_MACRO[micro] || "General";
-      return {
-        macro,
-        micro,
-        confidence,
-        reason: allTitles.length > 1 ? `${reason} (analyzed ${allTitles.length} recent channel titles)` : reason,
-        source: "ai",
-      };
-    }
-
-    return {
-      macro: "General",
-      micro: "Unclassified",
-      confidence: 0.50,
-      reason: "No high-confidence channel topics identified from current metadata",
-      source: "ai_unclassified",
-    };
-  }
-}
-
-class CustomAPIClassifierProvider extends BaseAIClassifierProvider {
-  constructor({ name = "custom_api", apiKey = "", endpoint = "" } = {}) {
-    super(name);
-    this.apiKey = apiKey;
-    this.endpoint = endpoint;
-    this.fallback = new HeuristicAIClassifierProvider();
-  }
-
-  async classifyChannel(channelInfo) {
-    if (!this.apiKey || !this.endpoint) {
-      return this.fallback.classifyChannel(channelInfo);
-    }
-    const titlesList = Array.isArray(channelInfo.videoTitles) && channelInfo.videoTitles.length > 0
-      ? channelInfo.videoTitles.join("; ")
-      : (channelInfo.videoTitle || "");
-
-    try {
-      const res = await fetch(this.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          prompt: `Classify YouTube channel "${channelInfo.channelName || channelInfo.channelId}" based on video titles: [${titlesList}]. Return JSON with macro and micro category.`,
-        }),
-      });
-      const data = await res.json();
-      if (data && data.micro) {
-        return {
-          macro: data.macro || MICRO_TO_MACRO[data.micro] || "General",
-          micro: data.micro,
-          confidence: data.confidence || 0.9,
-          reason: data.reason || "Remote API classification",
-          source: "ai",
-        };
-      }
-    } catch (err) {
-      console.error("[Stoic AI] Remote API classification failed, using fallback:", err);
-    }
-    return this.fallback.classifyChannel(channelInfo);
-  }
-}
-
-class AIClassifierRegistry {
-  constructor() {
-    this.provider = new HeuristicAIClassifierProvider();
-  }
-
-  setProvider(provider) {
-    if (provider && typeof provider.classifyChannel === "function") {
-      this.provider = provider;
-    }
-  }
-
-  getProvider() {
-    return this.provider;
-  }
-
-  async classifyChannel(channelInfo) {
-    return this.provider.classifyChannel(channelInfo);
-  }
-}
-
-const defaultAIClassifierRegistry = new AIClassifierRegistry();
-
-const inFlightAIClassifications = new Map();
-const DEFAULT_AI_CONFIDENCE_THRESHOLD = 0.70;
-const AI_SETTINGS_KEY = "ai_settings";
-const DEFAULT_AI_SETTINGS = {
-  provider: "heuristic", // "heuristic" | "custom_api"
-  apiKey: "",
-  apiEndpoint: "",
-  confidenceThreshold: 0.70,
-  autoClassify: true,
-};
-
-let inMemoryAISettings = null;
-
-async function getAISettings() {
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    const { [AI_SETTINGS_KEY]: settings } = await chrome.storage.local.get(AI_SETTINGS_KEY);
-    return { ...DEFAULT_AI_SETTINGS, ...(settings || {}) };
-  }
-  return inMemoryAISettings ? { ...DEFAULT_AI_SETTINGS, ...inMemoryAISettings } : { ...DEFAULT_AI_SETTINGS };
-}
-
-async function saveAISettings(settings) {
-  const updated = { ...DEFAULT_AI_SETTINGS, ...settings };
-  inMemoryAISettings = updated;
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    await chrome.storage.local.set({ [AI_SETTINGS_KEY]: updated });
-  }
-  return updated;
-}
-
-async function classifyUnknownChannel(metadata, options = {}) {
-  if (!metadata) return null;
-  const channelId = metadata.channelId || metadata.channelName;
-  const channelName = metadata.channelName || metadata.channelId;
-
-  if (!channelId && !channelName) return null;
-
-  const forceReclassify = options.forceReclassify === true;
-  const aiSettings = await getAISettings();
-
-  const autoClassify = options.autoClassify !== undefined ? options.autoClassify : aiSettings.autoClassify;
-  if (!autoClassify && !forceReclassify) {
-    return (await getChannel(channelId)) || (await getChannel(channelName));
-  }
-
-  const confidenceThreshold = options.confidenceThreshold !== undefined
-    ? options.confidenceThreshold
-    : (aiSettings.confidenceThreshold !== undefined ? aiSettings.confidenceThreshold : DEFAULT_AI_CONFIDENCE_THRESHOLD);
-
-  const existing = (await getChannel(channelId)) || (await getChannel(channelName));
-
-  // Requirement: Manual overrides must NEVER be overwritten automatically!
-  if (existing && existing.source === "manual" && !forceReclassify) {
-    return existing;
-  }
-
-  // Reuse cached AI classification permanently unless forcing reclassify!
-  if (existing && existing.classification && existing.classification.micro !== "Unclassified" && existing.source === "ai" && !forceReclassify) {
-    return existing;
-  }
-
-  const key = String(channelId || channelName).trim().toLowerCase();
-  if (inFlightAIClassifications.has(key)) {
-    return inFlightAIClassifications.get(key);
-  }
-
-  const classificationPromise = (async () => {
-    try {
-      // Build richer channel profile using recent video titles stored in database
-      const videoDb = await getVideoDatabase();
-      const channelVideos = Object.values(videoDb).filter((v) => {
-        if (!v) return false;
-        if (channelId && v.channelId === channelId) return true;
-        if (channelName && v.channelName && v.channelName.toLowerCase() === channelName.toLowerCase()) return true;
-        return false;
-      });
-      const recentTitles = channelVideos.map((v) => v.title).filter(Boolean).slice(-10);
-      const currentTitle = metadata.title || metadata.videoTitle || "";
-      if (currentTitle && !recentTitles.includes(currentTitle)) {
-        recentTitles.push(currentTitle);
-      }
-
-      let provider = options.provider;
-      if (!provider) {
-        if (aiSettings.provider === "custom_api" && aiSettings.apiKey && aiSettings.apiEndpoint) {
-          provider = new CustomAPIClassifierProvider({
-            apiKey: aiSettings.apiKey,
-            endpoint: aiSettings.apiEndpoint,
-          });
-        } else {
-          provider = defaultAIClassifierRegistry.getProvider();
-        }
-      }
-
-      let aiResult = null;
-      let attempts = 0;
-      const maxAttempts = options.maxRetries || 2;
-      while (attempts < maxAttempts) {
-        try {
-          aiResult = await provider.classifyChannel({
-            channelId,
-            channelName,
-            videoTitle: currentTitle,
-            videoTitles: recentTitles,
-            contentType: metadata.contentType || "video",
-            url: metadata.url || "",
-          });
-          if (aiResult) break;
-        } catch (err) {
-          attempts++;
-          if (attempts >= maxAttempts) throw err;
-          await new Promise((r) => setTimeout(r, 150 * attempts));
-        }
-      }
-
-      if (!aiResult) return existing || null;
-
-      const isLowConfidence = aiResult.confidence < confidenceThreshold;
-
-      let classification = null;
-      let source = "ai";
-
-      if (isLowConfidence) {
-        classification = { macro: "General", micro: "Unclassified" };
-        source = "ai_unclassified";
-      } else {
-        classification = {
-          macro: aiResult.macro || MICRO_TO_MACRO[aiResult.micro] || "General",
-          micro: aiResult.micro,
-        };
-        source = options.manual ? "manual" : (aiResult.source || "ai");
-      }
-
-      const updatedChannel = {
-        channelId: channelId || key,
-        channelName: channelName || key,
-        classification,
-        confidence: aiResult.confidence !== undefined ? aiResult.confidence : 0.85,
-        reason: aiResult.reason || "AI classification",
-        source,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await saveChannel(updatedChannel);
-      return updatedChannel;
-    } catch (err) {
-      console.error("[Stoic AI] Channel classification error:", err);
-      return existing || null;
-    } finally {
-      inFlightAIClassifications.delete(key);
-    }
-  })();
-
-  inFlightAIClassifications.set(key, classificationPromise);
-  return classificationPromise;
-}
-
-// YouTube Storage & Database Helpers
-const YT_CHANNELS_KEY = "yt_channels";
-const YT_VIDEOS_KEY = "yt_videos";
-
-let inMemoryChannelDb = {};
-let inMemoryVideoDb = {};
-
-async function getChannelDatabase() {
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    const { [YT_CHANNELS_KEY]: channels = {} } = await chrome.storage.local.get(YT_CHANNELS_KEY);
-    inMemoryChannelDb = channels || {};
-    return channels || {};
-  }
-  return inMemoryChannelDb || {};
-}
-
-async function saveChannelDatabase(channels) {
-  inMemoryChannelDb = channels || {};
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    await chrome.storage.local.set({ [YT_CHANNELS_KEY]: channels });
-  }
-}
-
-async function getChannel(channelIdOrName) {
-  if (!channelIdOrName) return null;
-  const db = await getChannelDatabase();
-  if (db[channelIdOrName]) return db[channelIdOrName];
-  const queryLower = String(channelIdOrName).toLowerCase();
-  return Object.values(db).find((c) => c && (c.channelId === channelIdOrName || (c.channelName && c.channelName.toLowerCase() === queryLower))) || null;
-}
-
-async function saveChannel(channelData) {
-  if (!channelData || (!channelData.channelId && !channelData.channelName)) return null;
-  const db = await getChannelDatabase();
-  const key = channelData.channelId || channelData.channelName;
-  const existing = db[key] || {};
-  const updated = {
-    channelId: channelData.channelId || existing.channelId || key,
-    channelName: channelData.channelName || existing.channelName || key,
-    classification: channelData.classification || existing.classification || { macro: "Leisure", micro: "Streaming" },
-    confidence: channelData.confidence !== undefined ? channelData.confidence : (existing.confidence || 0.9),
-    reason: channelData.reason || existing.reason || "",
-    source: channelData.source || existing.source || "manual",
-    updatedAt: channelData.updatedAt || new Date().toISOString(),
-  };
-  db[updated.channelId] = updated;
-  if (updated.channelName && updated.channelName !== updated.channelId) {
-    db[updated.channelName] = updated;
-  }
-  await saveChannelDatabase(db);
-  return updated;
-}
-
-async function getVideoDatabase() {
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    const { [YT_VIDEOS_KEY]: videos = {} } = await chrome.storage.local.get(YT_VIDEOS_KEY);
-    inMemoryVideoDb = videos || {};
-    return videos || {};
-  }
-  return inMemoryVideoDb || {};
-}
-
-async function saveVideoDatabase(videos) {
-  inMemoryVideoDb = videos || {};
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    await chrome.storage.local.set({ [YT_VIDEOS_KEY]: videos });
-  }
-}
-
-async function getVideo(videoId) {
-  if (!videoId) return null;
-  const db = await getVideoDatabase();
-  return db[videoId] || null;
-}
-
-async function saveVideo(videoData) {
-  if (!videoData || !videoData.videoId) return null;
-  const db = await getVideoDatabase();
-  const existing = db[videoData.videoId] || {};
-  const updated = {
-    videoId: videoData.videoId,
-    title: videoData.title || existing.title || "",
-    channelId: videoData.channelId || existing.channelId || null,
-    channelName: videoData.channelName || existing.channelName || null,
-    contentType: videoData.contentType || existing.contentType || "video",
-    updatedAt: videoData.updatedAt || new Date().toISOString(),
-  };
-  db[videoData.videoId] = updated;
-  await saveVideoDatabase(db);
-  return updated;
-}
-
-async function recordYouTubeVisit(metadata) {
-  if (!metadata || (!metadata.videoId && !metadata.channelId && !metadata.channelName)) return null;
-
-  let savedVideo = null;
-  if (metadata.videoId) {
-    savedVideo = await saveVideo(metadata);
-  }
-
-  const channelQuery = metadata.channelId || metadata.channelName;
-  let channelHit = false;
-  let existingChannel = null;
-
-  if (channelQuery) {
-    existingChannel = await getChannel(channelQuery);
-    if (existingChannel && existingChannel.classification && existingChannel.classification.micro !== "Unclassified") {
-      channelHit = true;
-    } else {
-      // Trigger AI classification for unknown channel in background
-      classifyUnknownChannel(metadata).catch((err) => {
-        console.error("[Stoic AI] Background channel classification error:", err);
-      });
-    }
-  }
-
-  return {
-    video: savedVideo,
-    channel: existingChannel,
-    channelHit,
-  };
-}
 
 // Singletons & Core API Entry Points
 const defaultExtractorRegistry = new ExtractorRegistry();
@@ -1553,11 +1163,47 @@ defaultExtractorRegistry.register(new ChatGPTExtractorAdapter());
 defaultExtractorRegistry.register(new RedditExtractorAdapter());
 
 const defaultClassificationPipeline = new ClassificationPipeline();
-defaultClassificationPipeline.addRule(new UserOverrideClassifierRule());
-defaultClassificationPipeline.addRule(new ContentExtractorClassifierRule());
-defaultClassificationPipeline.addRule(new ChannelClassifierRule());
-defaultClassificationPipeline.addRule(new DomainRuleClassifierRule());
-defaultClassificationPipeline.addRule(new FallbackClassifierRule());
+defaultClassificationPipeline.addRule(new UserOverrideClassifierRule(), RULE_PRIORITY.USER_OVERRIDE);
+defaultClassificationPipeline.addRule(new ContentExtractorClassifierRule(), RULE_PRIORITY.CONTENT_EXTRACTOR);
+defaultClassificationPipeline.addRule(new DomainRuleClassifierRule(), RULE_PRIORITY.DOMAIN_RULE);
+defaultClassificationPipeline.addRule(new FallbackClassifierRule(), RULE_PRIORITY.FALLBACK);
+
+// Platform modules (youtube-classifier.js) call this on load to slot their
+// own rules into the default pipeline at the right priority. Keeping the
+// registration one-directional is what lets common.js stay unaware of
+// YouTube while still classifying it correctly.
+function registerClassifierRule(rule, priority = RULE_PRIORITY.DOMAIN_RULE) {
+  defaultClassificationPipeline.addRule(rule, priority);
+  invalidateClassificationCache();
+}
+
+// ---------- content services ----------
+// A content service knows how to split one site's tracked time across
+// several categories — YouTube time belongs to the channels and videos
+// that were actually watched, not to "youtube.com". Analytics asks the
+// registry; it never asks about YouTube directly.
+//
+// Interface:
+//   name           string
+//   handlesDomain(domain) -> boolean
+//   resolveSegments(domain, entry, dayKey, totalSeconds, sites)
+//                  -> [{ macro, micro, seconds, sources }] | null
+const contentServices = [];
+
+function registerContentService(service) {
+  if (
+    service &&
+    typeof service.handlesDomain === "function" &&
+    typeof service.resolveSegments === "function"
+  ) {
+    contentServices.push(service);
+    invalidateClassificationCache();
+  }
+}
+
+function getContentServices() {
+  return contentServices.slice();
+}
 
 const defaultClassificationCache = new ClassificationCache();
 
@@ -1579,15 +1225,21 @@ function classifyContext(input, sites = null, options = {}) {
   return result;
 }
 
+// Retained for callers that want to be sure the platform stores behind the
+// pipeline are loaded before classifying (the service worker's debug
+// handler). Classification itself is synchronous — platform modules keep
+// in-memory snapshots — so this only primes them.
 async function classifyContextAsync(input, sites = null, options = {}) {
-  const channelDb = options.channelDb || await getChannelDatabase();
-  const extra = { ...options.extraContext };
-  extra.channelDb = channelDb;
-
-  return classifyContext(input, sites, {
-    ...options,
-    extraContext: extra,
-  });
+  for (const service of contentServices) {
+    if (typeof service.prime === "function") {
+      try {
+        await service.prime();
+      } catch {
+        /* a platform that can't prime still classifies off its last snapshot */
+      }
+    }
+  }
+  return classifyContext(input, sites, options);
 }
 
 function getDomainTaxonomy(domainOrInput, sites = null) {
@@ -1603,18 +1255,41 @@ function getDomainCategory(domain, sites = null) {
   return micro;
 }
 
+// Single definition of how much a category counts toward the focus score —
+// read straight off MACRO_CATEGORIES so the weights can't drift.
 function getCategoryFocusWeight(category) {
   const cat = typeof category === "object" ? category.macro : category;
-  switch (cat) {
-    case "Productivity":
-      return 1.0;
-    case "General":
-      return 0.6;
-    case "Leisure":
-      return 0.1;
-    default:
-      return 0.6;
+  const def = MACRO_CATEGORIES[cat];
+  return def ? def.weight : MACRO_CATEGORIES.General.weight;
+}
+
+// ---------- category segmentation ----------
+// The one place that answers "how does this site's time for this day break
+// down by category?". A plain site is a single segment carrying its whole
+// day; a site owned by a content service (YouTube) is split across the
+// content that was actually consumed on it.
+//
+// Every analytics function goes through here, so a channel re-classification
+// or a manual override lands identically in the focus score, the category
+// breakdown, and the audit table — there is no second code path to update.
+function entryCategorySegments(domain, entry, dayKey, sites, totalSeconds) {
+  const seconds =
+    totalSeconds !== undefined ? totalSeconds : usageSecondsForDate(entry, dayKey, dayKey);
+  if (!(seconds > 0)) return [];
+
+  for (const service of contentServices) {
+    if (!service.handlesDomain(domain)) continue;
+    let segments = null;
+    try {
+      segments = service.resolveSegments(domain, entry, dayKey, seconds, sites);
+    } catch (err) {
+      console.error(`[Stoic] content service "${service.name}" failed to segment ${domain}`, err);
+    }
+    if (segments && segments.length) return segments;
   }
+
+  const { macro, micro } = getDomainTaxonomy(domain, sites);
+  return [{ macro, micro, seconds, sources: ["domain_rule"] }];
 }
 
 function calculateFocusScore(sites, today = todayStr()) {
@@ -1628,23 +1303,28 @@ function calculateFocusScore(sites, today = todayStr()) {
     if (sec <= 0) return;
 
     totalSeconds += sec;
-    const { macro } = getDomainTaxonomy(domain, sites);
-    const catWeight = getCategoryFocusWeight(macro);
     const mode = entry.mode || "unconstrained";
-    let siteWeight = catWeight;
 
-    if (mode === "block") {
-      siteWeight = 0.0;
-    } else if (mode === "limit") {
-      const limitSec = (limitMinutesForDate(entry, dateFromKey(today) || new Date()) || entry.limitMinutes || 30) * 60;
-      if (sec <= limitSec) {
-        siteWeight = Math.max(catWeight, 0.7);
-      } else {
-        siteWeight = Math.min(catWeight, 0.1);
+    // Weigh each category segment on its own merits. An hour of YouTube is
+    // no longer one flat "leisure" hour — the part spent on a channel
+    // classified as productive is scored as productive.
+    entryCategorySegments(domain, entry, today, sites, sec).forEach((segment) => {
+      const catWeight = getCategoryFocusWeight(segment.macro);
+      let segmentWeight = catWeight;
+
+      if (mode === "block") {
+        segmentWeight = 0.0;
+      } else if (mode === "limit") {
+        const limitSec = (limitMinutesForDate(entry, dateFromKey(today) || new Date()) || entry.limitMinutes || 30) * 60;
+        if (sec <= limitSec) {
+          segmentWeight = Math.max(catWeight, 0.7);
+        } else {
+          segmentWeight = Math.min(catWeight, 0.1);
+        }
       }
-    }
 
-    weightedSeconds += sec * siteWeight;
+      weightedSeconds += segment.seconds * segmentWeight;
+    });
 
     if (entry.lastReset === today && entry.timesTripped > 0) {
       trippedPenalty += entry.timesTripped * 3;
@@ -1710,12 +1390,14 @@ function getCategoryBreakdown(sites, today = todayStr()) {
     const sec = usageSecondsForDate(entry, today, today);
     if (sec > 0) {
       totalSeconds += sec;
-      const { macro, micro } = getDomainTaxonomy(domain, sites);
-      if (!macros[macro]) {
-        macros[macro] = { name: macro, seconds: 0, micros: {} };
-      }
-      macros[macro].seconds += sec;
-      macros[macro].micros[micro] = (macros[macro].micros[micro] || 0) + sec;
+      entryCategorySegments(domain, entry, today, sites, sec).forEach((segment) => {
+        const { macro, micro, seconds } = segment;
+        if (!macros[macro]) {
+          macros[macro] = { name: macro, seconds: 0, micros: {} };
+        }
+        macros[macro].seconds += seconds;
+        macros[macro].micros[micro] = (macros[macro].micros[micro] || 0) + seconds;
+      });
     }
   });
 
@@ -1724,7 +1406,7 @@ function getCategoryBreakdown(sites, today = todayStr()) {
     const microList = Object.keys(mData.micros).map((mic) => ({
       micro: mic,
       macro: mac,
-      seconds: mData.micros[mic],
+      seconds: Math.round(mData.micros[mic]),
       minutes: Math.round(mData.micros[mic] / 60),
       pctOfMacro: mData.seconds > 0 ? Math.round((mData.micros[mic] / mData.seconds) * 100) : 0,
       pctOfTotal: totalSeconds > 0 ? Math.round((mData.micros[mic] / totalSeconds) * 100) : 0,
@@ -1732,7 +1414,7 @@ function getCategoryBreakdown(sites, today = todayStr()) {
 
     return {
       macro: mac,
-      seconds: mData.seconds,
+      seconds: Math.round(mData.seconds),
       minutes: Math.round(mData.seconds / 60),
       pctOfTotal: totalSeconds > 0 ? Math.round((mData.seconds / totalSeconds) * 100) : 0,
       micros: microList,
@@ -1767,6 +1449,17 @@ function getBrowsingStats(sites, today = todayStr()) {
     if (sec > 0) {
       totalSeconds += sec;
       const taxonomy = getDomainTaxonomy(domain, sites);
+      // For a segmented site the headline taxonomy is whichever category
+      // actually took the most time, not the generic domain rule — showing
+      // "Leisure · Streaming" against a day of lecture-watching was the
+      // most visible symptom of classification never reaching analytics.
+      const segments = entryCategorySegments(domain, entry, today, sites, sec);
+      const dominant = segments.length > 0 ? segments[0] : null;
+      const effective =
+        segments.length > 0
+          ? { macro: dominant.macro, micro: dominant.micro }
+          : taxonomy;
+
       allSitesList.push({
         domain,
         entry,
@@ -1774,9 +1467,12 @@ function getBrowsingStats(sites, today = todayStr()) {
         minutes: Math.round(sec / 60),
         mode: entry.mode || "unconstrained",
         paused: !!entry.paused,
-        taxonomy,
-        category: taxonomy.micro,
-        macroCategory: taxonomy.macro,
+        taxonomy: effective,
+        domainTaxonomy: taxonomy,
+        segments,
+        segmented: segments.length > 1,
+        category: effective.micro,
+        macroCategory: effective.macro,
       });
     }
   });
@@ -2066,39 +1762,26 @@ const api = {
   ClassifierRule,
   UserOverrideClassifierRule,
   ContentExtractorClassifierRule,
-  ChannelClassifierRule,
   DomainRuleClassifierRule,
   FallbackClassifierRule,
   ClassificationPipeline,
   ClassificationCache,
+  RULE_PRIORITY,
+  registerClassifierRule,
+  registerContentService,
+  getContentServices,
+  entryCategorySegments,
+  invalidateClassificationCache,
+  getClassificationEpoch,
   defaultExtractorRegistry,
   defaultClassificationPipeline,
   defaultClassificationCache,
-  BaseAIClassifierProvider,
-  HeuristicAIClassifierProvider,
-  CustomAPIClassifierProvider,
-  AIClassifierRegistry,
-  defaultAIClassifierRegistry,
-  classifyUnknownChannel,
-  getAISettings,
-  saveAISettings,
-  AI_SETTINGS_KEY,
-  DEFAULT_AI_SETTINGS,
-  DEFAULT_AI_CONFIDENCE_THRESHOLD,
-  YT_CHANNELS_KEY,
-  YT_VIDEOS_KEY,
-  getChannelDatabase,
-  saveChannelDatabase,
-  getChannel,
-  saveChannel,
-  getVideoDatabase,
-  saveVideoDatabase,
-  getVideo,
-  saveVideo,
-  recordYouTubeVisit,
   MACRO_CATEGORIES,
+  MACRO_ORDER,
+  DEFAULT_MICRO_FOR_MACRO,
   MICRO_CATEGORIES,
   MICRO_TO_MACRO,
+  selectableMicrosByMacro,
   getCategoryFocusWeight,
   getDomainDisplayName,
   getCategoryBreakdown,
