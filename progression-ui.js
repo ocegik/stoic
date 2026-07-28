@@ -41,6 +41,7 @@ const {
 
 const {
   xpProgressForLevel,
+  rankForLevel,
   evaluateConditions,
   ACHIEVEMENTS,
   RECORDS,
@@ -138,6 +139,27 @@ function renderLevelIdentity(state) {
         <div class="prog-xp-bar"><div class="prog-xp-bar-fill" style="width:${progress.pct.toFixed(1)}%;"></div></div>
         <div class="prog-xp-note">${xpRemaining} XP to Level ${progress.level + 1} · ${Math.round(state.level.xp)} XP total</div>
       </div>
+    </div>
+  `;
+}
+
+// ---------- renderLevelUpBanner ----------
+// Shown once, in the popup and at the top of the Progress tab
+// (01-PRODUCT-DESIGN.md §2.11): a quiet, dismissible inline banner, no
+// modal, no animation beyond what CSS transitions the caller already has.
+// Dismissal is the caller's job (no event listeners in this file) — it
+// should send a PROGRESSION_EVENT of type "level_up_seen" when the
+// ".prog-levelup-dismiss" button here is clicked.
+function renderLevelUpBanner(state) {
+  const levelUp = state.level && state.level.lastLevelUp;
+  if (!levelUp || levelUp.seen) return "";
+  const rank = rankForLevel(levelUp.level);
+  return `
+    <div class="prog-levelup-banner">
+      <div class="prog-levelup-text">
+        <span class="prog-levelup-level">Level ${levelUp.level}</span> reached — ${rank.name}. ${rank.descriptor}
+      </div>
+      <button type="button" class="prog-levelup-dismiss" aria-label="Dismiss level-up notice">Dismiss</button>
     </div>
   `;
 }
@@ -467,6 +489,7 @@ function renderPopupStrip(state, liveDay) {
 const progressionUiApi = {
   buildLiveDayView,
   renderLevelIdentity,
+  renderLevelUpBanner,
   renderTodayStanding,
   renderStreaks,
   renderContributionGrid,

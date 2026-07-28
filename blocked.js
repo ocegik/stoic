@@ -75,6 +75,27 @@ async function pickQuote() {
   return QUOTES[index];
 }
 
+// "Turned back from this site: N times" — the block page's own live
+// reinforcement for a refusal, since the XP for it only lands at next
+// settlement (01-PRODUCT-DESIGN.md §2.5). DayRecord has no per-domain gate
+// data, so this reads the honest sources that do: the settled lifetime
+// counter plus whatever today's live gate counters (not yet settled) add
+// for this domain, capped the same way settlement itself caps a domain's
+// daily refusals.
+async function turnedBackCountFor(domain) {
+  const prog = await loadProgression();
+  const settled = (prog.lifetime.refusalsByDomain && prog.lifetime.refusalsByDomain[domain]) || 0;
+
+  let liveToday = 0;
+  if (prog.today && prog.today.date === todayStr()) {
+    const shown = (prog.today.gatesShown && prog.today.gatesShown[domain]) || 0;
+    const passed = (prog.today.gatesPassed && prog.today.gatesPassed[domain]) || 0;
+    liveToday = Math.min(Math.max(shown - passed, 0), REFUSAL_MAX_PER_DOMAIN_PER_DAY);
+  }
+
+  return settled + liveToday;
+}
+
 async function main() {
   const themePref = await getThemePreference();
   applyTheme(themePref);
@@ -119,8 +140,10 @@ async function main() {
     eyebrowStatus.textContent = "MINDFUL PAUSE · RESTRAINT MODE";
     headline.textContent = "You're about to throw away your focus again.";
     subhead.innerHTML = `You installed Stoic because you knew a moment like this — reaching for <span class="site">${displayName}</span> — would come. Is this genuinely important, or just another dopamine hit? Every distraction here delays the work that actually moves your life forward.`;
+    const turnedBack = await turnedBackCountFor(site);
     statRow.innerHTML = `
       <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times paused</div></div>
+      <div class="stat-cell"><div class="stat-value">${turnedBack}</div><div class="stat-label">Turned back</div></div>
     `;
     equivalency.textContent = "Restraint Mode isn't here to be convenient. It's here to make you decide on purpose, not on impulse.";
 

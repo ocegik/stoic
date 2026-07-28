@@ -58,11 +58,57 @@ Tests for a phase belong in that phase's session.
 - [x] **Phase 3** — `progression-engine.js` + `test/progression-engine.test.js`
 - [x] **Phase 4** — `background.js` wiring (importScripts, 2 events, alarm, messages)
 - [x] **Phase 5** — `progression-ui.js` + `progression.css`
-- [ ] **Phase 6.1** — popup strip + level-up banner
-- [ ] **Phase 6.4** — `manifest.json` (web_accessible_resources, version 2.3.0)
-- [ ] **Phase 6.2** — options Progress tab + Preferences fields + export/import
-- [ ] **Phase 6.3** — blocked page "Turned back" cell
+- [x] **Phase 6.1** — popup strip + level-up banner
+- [x] **Phase 6.4** — `manifest.json` (web_accessible_resources, version 2.3.0)
+- [x] **Phase 6.2** — options Progress tab + Preferences fields + export/import
+- [x] **Phase 6.3** — blocked page "Turned back" cell
 - [ ] **Phase 7** — test gaps closed, manual checklist run
+
+**Note on Session 5-7 (Phases 6.1-6.4).** `npm test` is green (193/193,
+unchanged — this was a UI-wiring session, no new pure logic beyond two small
+`recordEvent` branches, see below). All new HTML/script references were
+verified statically: every `<script src>`/`<link href>` in `popup.html`,
+`options.html` and `blocked.html` resolves to a real file; every
+`getElementById` call in `popup.js`/`options.js`/`blocked.js` has a matching
+static `id=` in its HTML (the handful of misses are ids `blocked.js` itself
+injects via `innerHTML` for the restraint widget, not missing markup); `node
+-c` syntax-checks clean on all five touched JS files; every progression CSS
+token used already exists in `tokens.css` for both themes.
+
+Loading the unpacked extension in real Chrome (`chrome://extensions`) was
+attempted again this session — via CLI (`--load-extension`, both headless
+and headed, with `--remote-debugging-port` to inspect targets via CDP) —
+and still fails the same way the Session 3+4 report described, but with the
+exact reason now confirmed in the log: `--load-extension is not allowed in
+Google Chrome, ignoring.` This is a branded-Chrome policy check, not a
+sandbox/accessibility limitation, and it can only be lifted by an enterprise
+policy (e.g. `ExtensionInstallSources`/an allow-list pushed via
+`com.google.Chrome.plist`) or by using Chromium instead of Google Chrome —
+neither of which this session did, since both are a system-level
+configuration change beyond what a code-review pass should make
+unilaterally. **Whoever has a machine that can actually open
+`chrome://extensions` → "Load unpacked" should do that check once** — it is
+the one thing this and the prior session could not do. Two new
+`PROGRESSION_EVENT` types were added beyond what Sessions 1-4 built,
+because Phases 6.1 and 6.2 explicitly call for them:
+- `level_up_seen` — dismisses the level-up banner (`03-IMPLEMENTATION-SPEC.md`
+  §6.1: "Dismiss sends `PROGRESSION_EVENT` with type `level_up_seen`").
+- `config_updated` — writes the two Daily Standard fields
+  (§6.2: "send `PROGRESSION_EVENT` `config_updated` with the clamped
+  values"). Clamping (15-240 / 40-90) happens in `options.js` before the
+  event is sent; `recordEvent` just writes what it's given, same as every
+  other event.
+
+One more addition beyond the two event types: restoring `progression` from
+an export/import backup is a whole-state replacement, not an incremental
+event, so it doesn't fit the `recordEvent`/`PROGRESSION_EVENT` shape at all.
+The spec says *what* to do ("restore it only when `payload.progression?.version`
+is a supported schema version... replace or skip, never merge") but not the
+transport. Added a new message type, `RESTORE_PROGRESSION` (`background.js`),
+that hands the raw imported state straight to the existing
+`migrateProgressionState` + `saveProgression` — still worker-only (I1), still
+zero new engine logic, just a second entry point into the same store
+functions `recordEvent` already uses.
 
 **Note on Phase 4/5 verification.** `npm test` is green (193/193) and every file
 syntax-checks. `background.js`'s wiring was verified statically (all

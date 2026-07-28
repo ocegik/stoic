@@ -109,6 +109,48 @@
   font-family: var(--mono);
 }
 
+/* ---- level-up banner: quiet, dismissible, shown once ---- */
+.prog-levelup-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 12px 16px;
+  background: var(--sem-green-dim);
+  border: 1px solid var(--sem-green-border);
+  border-radius: var(--radius-md, 14px);
+  animation: prog-levelup-fade 0.3s ease;
+}
+
+.prog-levelup-text {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.prog-levelup-level {
+  font-weight: 700;
+}
+
+.prog-levelup-dismiss {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.prog-levelup-dismiss:hover {
+  color: var(--text-primary);
+}
+
+@keyframes prog-levelup-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ---- today's standing: three condition chips ---- */
 .prog-standing {
   display: grid;
@@ -513,5 +555,8 @@
   .prog-strip-xp-fill,
   .prog-record-tile {
     transition: none;
+  }
+  .prog-levelup-banner {
+    animation: none;
   }
 }

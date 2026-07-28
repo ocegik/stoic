@@ -297,6 +297,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // A whole-state restore from a backup file, not an incremental event —
+  // options.js already checked the schema version is one this build
+  // understands before sending it (03-IMPLEMENTATION-SPEC.md §6.2: replace
+  // or skip, never merge). Still worker-only per I1: the page hands over
+  // the raw object, migrateProgressionState + saveProgression do the actual
+  // write, same as every other path into progression-store.js.
+  if (message.type === "RESTORE_PROGRESSION") {
+    saveProgression(migrateProgressionState(message.state))
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
   if (message.type === "YOUTUBE_METADATA_UPDATE") {
     const tabId = sender.tab?.id || activeState.tabId;
     if (tabId && message.metadata) {

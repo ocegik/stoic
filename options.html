@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="progression.css" />
 <link rel="stylesheet" href="options.css" />
 </head>
 <body>
@@ -45,6 +46,10 @@
     <button class="nav-tab active" data-target="tab-overview" role="tab" aria-selected="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       Overview
+    </button>
+    <button class="nav-tab" data-target="tab-progress" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
+      Progress
     </button>
     <button class="nav-tab" data-target="tab-analysis" role="tab" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -126,6 +131,35 @@
         </div>
       </div>
 
+    </section>
+
+
+    <!-- TAB 2: PROGRESS -->
+    <section class="tab-panel" id="tab-progress" role="tabpanel" hidden>
+      <div class="dashboard-section">
+        <div id="progLevelUpBannerOptions"></div>
+
+        <h2 class="section-title">Identity</h2>
+        <div class="card" id="progIdentityContainer"></div>
+
+        <h2 class="section-title">Today's standing</h2>
+        <div class="card card-secondary" id="progStandingContainer"></div>
+
+        <h2 class="section-title">Streaks</h2>
+        <div class="card card-secondary" id="progStreaksContainer"></div>
+
+        <h2 class="section-title">Contribution grid</h2>
+        <div class="card card-secondary" id="progGridContainer"></div>
+
+        <h2 class="section-title">Personal records</h2>
+        <div class="card card-secondary" id="progRecordsContainer"></div>
+
+        <h2 class="section-title">Achievements</h2>
+        <div class="card card-secondary" id="progAchievementsContainer"></div>
+
+        <h2 class="section-title">Lifetime statistics</h2>
+        <div class="card card-secondary" id="progLifetimeContainer"></div>
+      </div>
     </section>
 
 
@@ -287,6 +321,29 @@
           <div id="optGlobalRedirectRow" style="display:none; margin-top: 12px; max-width: 440px;">
             <label for="optGlobalRedirectInput" class="field-label">Default Redirect URL</label>
             <input class="field" id="optGlobalRedirectInput" placeholder="https://..." />
+          </div>
+        </div>
+
+        <div class="card settings-card">
+          <h3>The Daily Standard</h3>
+          <p class="card-desc">Two thresholds that decide whether a day counts as held — the basis for streaks, XP and achievements.</p>
+
+          <div style="max-width: 440px; margin-top: 16px;">
+            <div class="field-row">
+              <label for="optLeisureCeilingInput">Leisure ceiling</label>
+              <input class="field" type="number" id="optLeisureCeilingInput" min="15" max="240" step="1" />
+              <span class="unit">min/day</span>
+            </div>
+            <p class="card-desc" style="margin: -6px 0 0;">A day is only held if leisure-category time stays at or under this many minutes.</p>
+          </div>
+
+          <div style="max-width: 440px; margin-top: 18px;">
+            <div class="field-row">
+              <label for="optFocusTargetInput">Focus target</label>
+              <input class="field" type="number" id="optFocusTargetInput" min="40" max="90" step="1" />
+              <span class="unit">score</span>
+            </div>
+            <p class="card-desc" style="margin: -6px 0 0;">A day is only held if the focus score reaches this value — waived on a day with under 30 minutes tracked.</p>
           </div>
         </div>
       </div>
@@ -689,6 +746,9 @@
 
 <script src="common.js"></script>
 <script src="youtube-classifier.js"></script>
+<script src="progression-model.js"></script>
+<script src="progression-store.js"></script>
+<script src="progression-ui.js"></script>
 <script src="options.js"></script>
 </body>
 </html>

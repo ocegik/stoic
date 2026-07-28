@@ -174,6 +174,33 @@ async function render() {
 
   // 3. Classification Debugger
   renderDebugInfo();
+
+  // 4. Progression strip — level/rank/XP bar and today's three condition
+  // dots, built live from `sites` rather than lagging a day behind
+  // settlement (buildLiveDayView, progression-ui.js).
+  await renderProgression(sites);
+}
+
+async function renderProgression(sites) {
+  const progStripEl = document.getElementById("progStrip");
+  const progBannerEl = document.getElementById("progLevelUpBanner");
+  if (!progStripEl && !progBannerEl) return;
+
+  const prog = await loadProgression();
+  const liveDay = buildLiveDayView(sites, prog);
+
+  if (progStripEl) progStripEl.innerHTML = renderPopupStrip(prog, liveDay);
+
+  if (progBannerEl) {
+    progBannerEl.innerHTML = renderLevelUpBanner(prog);
+    const dismissBtn = progBannerEl.querySelector(".prog-levelup-dismiss");
+    if (dismissBtn) {
+      dismissBtn.addEventListener("click", async () => {
+        progBannerEl.innerHTML = "";
+        await sendProgressionEvent("level_up_seen", {});
+      });
+    }
+  }
 }
 
 async function renderDebugInfo() {
@@ -254,6 +281,16 @@ async function renderDebugInfo() {
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   render();
+  // Fire-and-forget: an idle browser only settles progression when
+  // something checks in. Opening the popup is exactly that moment
+  // (03-IMPLEMENTATION-SPEC.md §6.1).
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+    chrome.runtime.sendMessage({ type: "REQUEST_SETTLEMENT" }, () => {
+      if (chrome.runtime.lastError) {
+        /* ignore — no receiving end */
+      }
+    });
+  }
 });
 
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {

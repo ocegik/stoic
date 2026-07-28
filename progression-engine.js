@@ -519,6 +519,23 @@ function applyEvent(state, type, payload, todayKey) {
     case "rule_loosened":
       next.lifetime.rulesLoosened = (next.lifetime.rulesLoosened || 0) + 1;
       break;
+    case "level_up_seen":
+      // Dismissal only ever flips the flag already set by settleDay's
+      // applyLevelXp — it never touches level/xp themselves (T2).
+      if (next.level.lastLevelUp) next.level.lastLevelUp.seen = true;
+      break;
+    case "config_updated":
+      // Clamping to the product-defined ranges (15-240 / 40-90) is the
+      // caller's job (options.js) — this just writes whatever it's handed
+      // into state.config, the same way every other event is a thin
+      // pass-through onto state.
+      if (payload && typeof payload.leisureCeilingMinutes === "number") {
+        next.config.leisureCeilingMinutes = payload.leisureCeilingMinutes;
+      }
+      if (payload && typeof payload.focusTarget === "number") {
+        next.config.focusTarget = payload.focusTarget;
+      }
+      break;
     default:
       break; // unknown event type — ignore rather than throw
   }

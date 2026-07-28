@@ -77,6 +77,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optDomainAuditTable = document.getElementById("optDomainAuditTable");
   const optStreaksList = document.getElementById("optStreaksList");
 
+  // Progress tab refs (progression-ui.js fills these; options.js never
+  // builds progression markup itself, per 02-ARCHITECTURE.md §7).
+  const progLevelUpBannerOptions = document.getElementById("progLevelUpBannerOptions");
+  const progIdentityContainer = document.getElementById("progIdentityContainer");
+  const progStandingContainer = document.getElementById("progStandingContainer");
+  const progStreaksContainer = document.getElementById("progStreaksContainer");
+  const progGridContainer = document.getElementById("progGridContainer");
+  const progRecordsContainer = document.getElementById("progRecordsContainer");
+  const progAchievementsContainer = document.getElementById("progAchievementsContainer");
+  const progLifetimeContainer = document.getElementById("progLifetimeContainer");
+  const optLeisureCeilingInput = document.getElementById("optLeisureCeilingInput");
+  const optFocusTargetInput = document.getElementById("optFocusTargetInput");
+
   // Modal refs
   const optModal = document.getElementById("optModal");
   const optModalTitle = document.getElementById("optModalTitle");
@@ -326,6 +339,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Daily Standard thresholds (01-PRODUCT-DESIGN.md §7): the only two
+  // progression knobs exposed to the user. Clamped here to the product's
+  // fixed ranges before the event is even sent — recordEvent's
+  // config_updated handler writes whatever it's given, so the clamp has to
+  // happen on this side.
+  function clamp(value, min, max, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(n)));
+  }
+
+  if (optLeisureCeilingInput) {
+    optLeisureCeilingInput.addEventListener("change", async () => {
+      const clamped = clamp(optLeisureCeilingInput.value, 15, 240, DEFAULT_LEISURE_CEILING_MINUTES);
+      optLeisureCeilingInput.value = clamped;
+      await sendProgressionEvent("config_updated", { leisureCeilingMinutes: clamped });
+      renderProgress().catch((err) => console.error("[Stoic] progress tab render failed", err));
+    });
+  }
+
+  if (optFocusTargetInput) {
+    optFocusTargetInput.addEventListener("change", async () => {
+      const clamped = clamp(optFocusTargetInput.value, 40, 90, DEFAULT_FOCUS_TARGET);
+      optFocusTargetInput.value = clamped;
+      await sendProgressionEvent("config_updated", { focusTarget: clamped });
+      renderProgress().catch((err) => console.error("[Stoic] progress tab render failed", err));
+    });
+  }
+
   async function loadData() {
     // Classification is synchronous, so the YouTube stores must be in
     // memory before anything renders analytics off them.
@@ -390,6 +432,43 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderYouTubeDebugTab().catch((err) =>
       console.error("[Stoic] YouTube debugger render failed", err)
     );
+    renderProgress().catch((err) => console.error("[Stoic] progress tab render failed", err));
+  }
+
+  // Fills the Progress tab from progression-ui.js's render functions, and
+  // the two Daily Standard fields on the Preferences tab. options.js never
+  // builds progression markup itself — that would let this surface and
+  // popup.js drift (02-ARCHITECTURE.md §7).
+  async function renderProgress() {
+    const prog = await loadProgression();
+
+    if (progIdentityContainer) progIdentityContainer.innerHTML = renderLevelIdentity(prog);
+    if (progStandingContainer) progStandingContainer.innerHTML = renderTodayStanding(buildLiveDayView(sites, prog));
+    if (progStreaksContainer) progStreaksContainer.innerHTML = renderStreaks(prog);
+    if (progGridContainer) progGridContainer.innerHTML = renderContributionGrid(prog);
+    if (progRecordsContainer) progRecordsContainer.innerHTML = renderRecords(prog);
+    if (progAchievementsContainer) progAchievementsContainer.innerHTML = renderAchievements(prog);
+    if (progLifetimeContainer) progLifetimeContainer.innerHTML = renderLifetime(prog);
+
+    if (progLevelUpBannerOptions) {
+      progLevelUpBannerOptions.innerHTML = renderLevelUpBanner(prog);
+      const dismissBtn = progLevelUpBannerOptions.querySelector(".prog-levelup-dismiss");
+      if (dismissBtn) {
+        dismissBtn.addEventListener("click", async () => {
+          progLevelUpBannerOptions.innerHTML = "";
+          await sendProgressionEvent("level_up_seen", {});
+        });
+      }
+    }
+
+    // Don't clobber a value the user is mid-edit on — a re-render can be
+    // triggered by an unrelated rule save while this tab happens to be open.
+    if (optLeisureCeilingInput && document.activeElement !== optLeisureCeilingInput) {
+      optLeisureCeilingInput.value = prog.config.leisureCeilingMinutes;
+    }
+    if (optFocusTargetInput && document.activeElement !== optFocusTargetInput) {
+      optFocusTargetInput.value = prog.config.focusTarget;
+    }
   }
 
   function renderOverviewTopWebsites(topWebsites) {
@@ -747,6 +826,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (!proceed) return;
           delete sites[domain];
           await saveSites(sites);
+          await sendProgressionEvent("rule_deleted", { domain });
           renderAll();
         });
 
@@ -866,7 +946,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       createdAt: existing.createdAt || todayStr(),
     };
 
-    if (isLoosening(existing, updatedEntry)) {
+    const loosening = isLoosening(existing, updatedEntry);
+    if (loosening) {
       const proceed = await requestFrictionGate({
         title: `Loosen the rule for ${getDomainDisplayName(rawDomain)}?`,
         copy: "You're about to reduce a restriction you set up on purpose. If it still matters, it'll survive one minute of thinking about it.",
@@ -874,9 +955,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!proceed) return;
     }
 
+    // A rule is "created" the moment a domain goes from no real rule
+    // (absent, or the auto-created `unconstrained` entry every visited
+    // domain gets) to one that actually governs it — never on an edit that
+    // keeps governing it (01-PRODUCT-DESIGN.md §3.10: no XP for
+    // configuration work, but the origin achievement still needs the event).
+    const HAS_RULE_MODES = new Set(["limit", "restraint", "block"]);
+    const hadRule = HAS_RULE_MODES.has(existing.mode);
+    const hasRuleNow = HAS_RULE_MODES.has(updatedEntry.mode);
+
     sites[rawDomain] = updatedEntry;
 
     await saveSites(sites);
+    if (!hadRule && hasRuleNow) {
+      await sendProgressionEvent("rule_created", { domain: rawDomain });
+    } else if (loosening) {
+      await sendProgressionEvent("rule_loosened", { domain: rawDomain });
+    }
     closeModal();
     renderAll();
   });
@@ -913,6 +1008,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         exportedAt: new Date().toISOString(),
         storagePreference: storagePref,
         sites,
+        progression: await loadProgression(),
       };
 
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -958,7 +1054,35 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         await saveSites(payload.sites);
         sites = payload.sites;
+
+        // Never merge two progression states — replace the ledger wholesale
+        // or skip it entirely (03-IMPLEMENTATION-SPEC.md §6.2). A backup
+        // from before this feature shipped simply has no `progression` key,
+        // which is the common case and not worth a note. A version newer
+        // than this build understands is the only case worth telling the
+        // user about, since silently skipping it could look like data loss.
+        let progressionNote = "";
+        if (payload.progression && typeof payload.progression.version === "number") {
+          if (payload.progression.version <= PROGRESSION_SCHEMA_VERSION) {
+            await new Promise((resolve) => {
+              chrome.runtime.sendMessage({ type: "RESTORE_PROGRESSION", state: payload.progression }, () => {
+                if (chrome.runtime.lastError) {
+                  /* ignore — no receiving end */
+                }
+                resolve();
+              });
+            });
+          } else {
+            progressionNote = " Progress data in this file is from a newer version of Stoic and was left untouched.";
+          }
+        }
+
         renderAll();
+        if (progressionNote && optImportNote) {
+          optImportNote.textContent = `Backup imported.${progressionNote}`;
+          optImportNote.className = "settings-note";
+          optImportNote.hidden = false;
+        }
       } catch (err) {
         if (optImportNote) {
           optImportNote.textContent = err.message || "Failed to import file.";

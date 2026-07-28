@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Stoic - Site Time Limiter",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Set time limits or full blocks on distracting sites, with redirects and a reality-check block page.",
   "permissions": ["storage", "tabs", "alarms", "notifications"],
   "host_permissions": ["<all_urls>"],
@@ -25,7 +25,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["options.html", "tokens.css", "components.css", "options.css", "common.js", "youtube-classifier.js", "youtube-content.js", "options.js"],
+      "resources": ["options.html", "tokens.css", "components.css", "options.css", "common.js", "youtube-classifier.js", "youtube-content.js", "options.js", "progression-model.js", "progression-store.js", "progression-ui.js", "progression.css"],
       "matches": ["<all_urls>"]
     }
   ],
