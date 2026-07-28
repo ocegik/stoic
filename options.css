@@ -100,6 +100,10 @@ body {
   transform: translateY(-1px);
 }
 .nav-tab:hover svg { opacity: 1; }
+.nav-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
 
 .nav-tab.active {
   background: var(--bg-panel);
@@ -217,6 +221,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  margin-top: 48px;
 }
 
 .overview-section-title {
@@ -354,11 +359,14 @@ body {
   color: var(--text-muted);
 }
 
-/* ---- Dashboard Sections ---- */
+/* ---- Dashboard Sections ----
+   gap is the single source of truth for vertical rhythm between a
+   section's title, cards and panels — children should not carry their
+   own margin-top/bottom, or spacing doubles up. */
 .dashboard-section {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .section-title {
@@ -369,7 +377,38 @@ body {
   color: var(--text-primary);
 }
 
-/* ---- Cards & Panels ---- */
+/* ---- Panel header (title + description + primary action) ---- */
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.panel-desc {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+/* ---- Eyebrow-style section label ---- */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+.section-label.small { font-size: 10px; margin-bottom: 6px; }
+
+/* ---- Cards & Panels ----
+   .card is the primary, most prominent surface (hero insights, the
+   thing a user should notice first). .card-secondary flattens that
+   same surface for supporting/data-dense content — tables, charts,
+   grids — so not every panel on a page competes for attention equally. */
 .card {
   background: var(--bg-panel);
   border: 1px solid var(--border-soft);
@@ -381,6 +420,11 @@ body {
 
 .card:hover {
   border-color: var(--border);
+}
+
+.card-secondary {
+  padding: 24px;
+  box-shadow: var(--shadow-card);
 }
 
 .card h3 {
@@ -636,7 +680,6 @@ body {
 .filter-bar {
   display: flex;
   gap: 12px;
-  margin: 20px 0;
   flex-wrap: wrap;
 }
 
@@ -789,9 +832,40 @@ body {
 .modal-content { background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 16px; padding: 24px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
-.modal-close { background: transparent; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; line-height: 1; }
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.modal-close:hover { background: var(--bg-raised); color: var(--text-primary); }
+.modal-close:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.modal-body { display: flex; flex-direction: column; }
 .field-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 4px; }
+
+/* A field-row laid out as label+description on the left, control on the
+   right (settings-style rows), rather than label+input+unit inline. */
+.field-row.spread { justify-content: space-between; gap: 16px; }
+.field-row.spread .field-label { margin: 0; }
+
+/* Boxed group of sub-fields that appears conditionally beneath a parent
+   control (e.g. custom API fields under a provider dropdown). */
+.subfields-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+
+.time-row .time-field { flex: 1; min-width: 0; }
 
 /* ---- YOUTUBE DEBUGGER GRID ---- */
 .yt-debug-grid {

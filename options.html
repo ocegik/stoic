@@ -102,13 +102,13 @@
       </div>
 
       <!-- TOP WEBSITES SECTION (Part 4 Compact Rows) -->
-      <div class="overview-section" style="margin-top: 48px;">
+      <div class="overview-section">
         <h2 class="overview-section-title">Top Websites</h2>
         <div class="top-websites-list" id="optTopWebsitesList"></div>
       </div>
 
       <!-- BEHAVIOUR SUMMARY SECTION (Part 4 Compact Metrics Row) -->
-      <div class="overview-section" style="margin-top: 48px;">
+      <div class="overview-section">
         <h2 class="overview-section-title">Behaviour Summary</h2>
         <div class="overview-behaviour-row">
           <div class="compact-metric-item">
@@ -135,7 +135,7 @@
         <h2 class="section-title">Session Insights & Distribution</h2>
 
         <!-- Today's AI Insight Card -->
-        <div class="card" style="margin-bottom: 24px;">
+        <div class="card">
           <div class="insight-body">
             <div class="insight-badge">Session Insight</div>
             <div id="optInsightText" class="insight-text">Analyzing session activity...</div>
@@ -143,7 +143,7 @@
         </div>
 
         <!-- 7-Day Browsing Time Distribution -->
-        <div class="card card-secondary" style="margin-bottom: 24px;">
+        <div class="card card-secondary">
           <div class="card-header-flex">
             <div>
               <h3>7-Day Browsing Time Distribution</h3>
@@ -155,13 +155,13 @@
 
         <!-- Websites Visited Audit Table -->
         <div class="card card-secondary">
-          <div class="card-header-flex" style="margin-bottom: 16px;">
+          <div class="card-header-flex">
             <div>
               <h3>Websites Visited Audit & Quick Moderation</h3>
               <p class="card-desc">Detailed domain analytics and rule quick-actions</p>
             </div>
           </div>
-          <div id="optDomainAuditTable"></div>
+          <div id="optDomainAuditTable" class="table-wrapper"></div>
         </div>
       </div>
     </section>
@@ -197,7 +197,7 @@
         </div>
 
         <!-- Moderation Performance Summary -->
-        <div class="card card-secondary" style="margin-bottom: 24px;">
+        <div class="card card-secondary">
           <h3>Moderation Performance Summary</h3>
           <div class="mod-performance-grid">
             <div class="perf-cell">
@@ -216,7 +216,7 @@
         </div>
 
         <!-- Rule Adherence Streaks -->
-        <div class="card" style="margin-bottom: 24px;">
+        <div class="card">
           <div class="card-header-flex">
             <div>
               <h3>Rule Adherence Streaks</h3>
@@ -264,7 +264,7 @@
           <div class="settings-note" id="optSyncNote" hidden></div>
         </div>
 
-        <div class="card settings-card" style="margin-top: 16px;">
+        <div class="card settings-card">
           <h3>Appearance & Theme</h3>
           <p class="card-desc">Choose your preferred visual theme across Stoic popups, dashboard, and moderation pages.</p>
           
@@ -275,7 +275,7 @@
           </div>
         </div>
 
-        <div class="card settings-card" style="margin-top: 16px;">
+        <div class="card settings-card">
           <h3>Default Action When Limit Reached</h3>
           <p class="card-desc">Select what happens by default when your daily time allowance runs out on a site.</p>
           
@@ -314,7 +314,7 @@
           </div>
         </div>
 
-        <div class="card danger-card" style="margin-top: 24px;">
+        <div class="card danger-card">
           <h3>Danger Zone</h3>
           <p>Permanently remove all site disciplines and clear usage history. This action cannot be undone.</p>
           <button class="btn-danger" id="optResetAllBtn" type="button">Reset All Data & Clear History</button>
@@ -326,16 +326,16 @@
     <!-- TAB 6: YOUTUBE & CLASSIFICATION DEBUGGER -->
     <section class="tab-panel" id="tab-youtube-debug" role="tabpanel" hidden>
       <div class="dashboard-section">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <div class="panel-header">
           <div>
-            <h2 class="section-title" style="margin: 0;">YouTube Content Classification & Debugger</h2>
-            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Inspect live metadata extraction, channel database lookup, cache state, and confidence scores.</p>
+            <h2 class="section-title">YouTube Content Classification & Debugger</h2>
+            <p class="panel-desc">Inspect live metadata extraction, channel database lookup, cache state, and confidence scores.</p>
           </div>
           <button class="btn-ghost" type="button" id="refreshDebugBtn">Refresh Inspector</button>
         </div>
 
         <!-- Live Inspector Card -->
-        <div class="card settings-card" style="margin-bottom: 20px;">
+        <div class="card settings-card">
           <h3>Active Tab Metadata Inspector</h3>
           <div class="yt-debug-grid" style="margin-top: 14px;">
             <div class="yt-debug-card">
@@ -389,7 +389,7 @@
         </div>
 
         <!-- Downstream propagation: today's YouTube time by category -->
-        <div class="card settings-card" style="margin-bottom: 20px;">
+        <div class="card settings-card">
           <h3>Today's YouTube Time by Category</h3>
           <p class="card-desc">How this subsystem's classifications are actually being counted in your focus score and analytics right now.</p>
           <div id="optYtCategoryTotals" class="yt-category-totals">
@@ -398,15 +398,15 @@
         </div>
 
         <!-- AI Engine Settings Card -->
-        <div class="card settings-card" style="margin-bottom: 20px;">
+        <div class="card settings-card">
           <h3>AI Engine & Auto-Classification Settings</h3>
           <p class="card-desc">Configure the AI provider, confidence thresholds, and background channel classification behaviors.</p>
 
           <form id="aiSettingsForm" style="margin-top: 14px; display: grid; gap: 14px;">
-            <div class="field-row" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div class="field-row spread">
               <div>
-                <label for="aiProviderSelect" class="field-label" style="margin:0;">AI Classifier Provider</label>
-                <div style="font-size: 11.5px; color: var(--text-muted);">Choose local heuristic analysis or custom remote LLM API.</div>
+                <label for="aiProviderSelect" class="field-label">AI Classifier Provider</label>
+                <div class="field-hint">Choose local heuristic analysis or custom remote LLM API.</div>
               </div>
               <select id="aiProviderSelect" class="field" style="max-width: 240px;">
                 <option value="heuristic">Local Heuristic (Fast & Offline)</option>
@@ -414,7 +414,7 @@
               </select>
             </div>
 
-            <div id="customApiFieldsGroup" style="display: none; grid-gap: 10px; padding: 12px; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 8px;">
+            <div id="customApiFieldsGroup" class="subfields-panel" style="display: none;">
               <div>
                 <label for="aiApiKey" class="field-label">API Key</label>
                 <input type="password" id="aiApiKey" class="field" placeholder="sk-..." />
@@ -425,10 +425,10 @@
               </div>
             </div>
 
-            <div class="field-row" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div class="field-row spread">
               <div>
-                <label for="aiConfidenceThreshold" class="field-label" style="margin:0;">Confidence Acceptance Threshold</label>
-                <div style="font-size: 11.5px; color: var(--text-muted);">Classifications with confidence below this threshold fall back to Unclassified.</div>
+                <label for="aiConfidenceThreshold" class="field-label">Confidence Acceptance Threshold</label>
+                <div class="field-hint">Classifications with confidence below this threshold fall back to Unclassified.</div>
               </div>
               <div style="display: flex; align-items: center; gap: 10px;">
                 <input type="range" id="aiConfidenceThreshold" min="0.50" max="0.95" step="0.05" value="0.70" style="cursor: pointer;" />
@@ -436,10 +436,10 @@
               </div>
             </div>
 
-            <div class="field-row" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div class="field-row spread">
               <div>
-                <label for="aiAutoClassifyToggle" class="field-label" style="margin:0;">Automatic Background Channel Classification</label>
-                <div style="font-size: 11.5px; color: var(--text-muted);">Automatically classify unknown channels when visiting YouTube videos.</div>
+                <label for="aiAutoClassifyToggle" class="field-label">Automatic Background Channel Classification</label>
+                <div class="field-hint">Automatically classify unknown channels when visiting YouTube videos.</div>
               </div>
               <input type="checkbox" id="aiAutoClassifyToggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
             </div>
@@ -452,7 +452,7 @@
         </div>
 
         <!-- Channel Database Card -->
-        <div class="card settings-card" style="margin-bottom: 20px;">
+        <div class="card settings-card">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <div>
               <h3>Channel Database (yt_channels)</h3>
@@ -519,7 +519,7 @@
       <form id="ytClassifyForm" class="modal-body" novalidate>
         <label for="ytClassifySubject" class="field-label">Channel name or ID</label>
         <input class="field" id="ytClassifySubject" placeholder="e.g. Veritasium or UCHnyfMqiRRG1u-2MsSQLbXA" />
-        <div class="field-error" id="ytClassifyError" style="display:none;"></div>
+        <div class="field-error" id="ytClassifyError"></div>
         <div class="field-hint" id="ytClassifyHint">
           An explicit classification is permanent: this channel always resolves to the
           category you choose, and prediction never runs for it again.
@@ -555,7 +555,7 @@
       <form id="customCategoryForm" class="modal-body" novalidate>
         <label for="customCategoryName" class="field-label">Micro category name</label>
         <input class="field" id="customCategoryName" placeholder="e.g. Study" />
-        <div class="field-error" id="customCategoryError" style="display:none;"></div>
+        <div class="field-error" id="customCategoryError"></div>
 
         <label class="field-label" style="margin-top: 14px;">Macro category</label>
         <div class="segmented" id="customCategoryMacroSeg">
@@ -582,7 +582,7 @@
       <form id="optModalForm" class="modal-body" novalidate>
         <label for="optModalDomain" class="field-label">Domain Name</label>
         <input class="field" id="optModalDomain" placeholder="e.g. youtube.com" />
-        <div class="field-error" id="optModalDomainError" style="display:none;"></div>
+        <div class="field-error" id="optModalDomainError"></div>
 
         <label class="field-label" style="margin-top: 10px;">Moderation Mode</label>
         <div class="segmented" id="optModalModeSeg">
@@ -616,10 +616,10 @@
           </div>
         </div>
 
-        <details class="disclosure" style="margin: 14px 0 0 0;">
+        <details class="disclosure" style="margin-top: 14px;">
           <summary>Schedule & Focus Hours</summary>
-          <div style="padding-top: 10px;">
-            <div class="section-label small" style="margin-left:0;">Active Days</div>
+          <div>
+            <div class="section-label small">Active Days</div>
             <div class="day-picker" id="optModalDayPicker">
               <button class="day-btn active" type="button" data-day="1">M</button>
               <button class="day-btn active" type="button" data-day="2">T</button>

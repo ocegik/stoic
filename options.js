@@ -384,19 +384,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     optDomainAuditTable.innerHTML = "";
 
     if (!browsing.topWebsites || browsing.topWebsites.length === 0) {
-      optDomainAuditTable.innerHTML = `<div style="font-size:12px; color:var(--text-faint); padding:16px 0;">No website activity recorded today yet. Visit websites to view real-time session tracking!</div>`;
+      optDomainAuditTable.innerHTML = `<div style="font-size:12px; color:var(--text-faint); padding:16px;">No website activity recorded today yet. Visit websites to view real-time session tracking!</div>`;
       return;
     }
 
     let html = `
-      <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+      <table class="table">
         <thead>
-          <tr style="border-bottom:1px solid var(--border-soft); text-align:left; color:var(--text-faint); font-weight:600; text-transform:uppercase; font-size:10px; letter-spacing:0.06em;">
-            <th style="padding:10px 8px;">Website</th>
-            <th style="padding:10px 8px;">Hierarchy (Macro & Micro)</th>
-            <th style="padding:10px 8px;">Tracked Today</th>
-            <th style="padding:10px 8px;">Status & Moderation</th>
-            <th style="padding:10px 8px; text-align:right;">Action</th>
+          <tr>
+            <th>Website</th>
+            <th>Hierarchy (Macro & Micro)</th>
+            <th>Tracked Today</th>
+            <th>Status & Moderation</th>
+            <th style="text-align:right;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -447,15 +447,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
 
       html += `
-        <tr style="border-bottom:1px solid var(--border-soft);">
-          <td style="padding:12px 8px; font-weight:700; color:var(--text-primary);" title="${item.domain}">${displayName}</td>
-          <td style="padding:12px 8px;">${catSelectHtml}</td>
-          <td style="padding:12px 8px;">
+        <tr>
+          <td style="font-weight:700;" title="${item.domain}">${displayName}</td>
+          <td>${catSelectHtml}</td>
+          <td>
             <div style="font-weight:700; font-family:var(--mono); color:var(--text-primary);">${fmtDuration(item.seconds)}</div>
             <div style="font-size:10.5px; color:var(--text-faint); margin-top:2px;">${item.pctOfTotal}% of session</div>
           </td>
-          <td style="padding:12px 8px;">${statusBadge}</td>
-          <td style="padding:12px 8px; text-align:right;">
+          <td>${statusBadge}</td>
+          <td style="text-align:right;">
             <button class="btn-ghost audit-action-btn" data-domain="${item.domain}" style="padding:5px 10px; font-size:11px; font-weight:600;">
               ${item.mode === "unconstrained" ? "+ Limit" : "Edit Rule"}
             </button>
