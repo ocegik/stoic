@@ -362,6 +362,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  async function applyDomainCategory(domain, micro, macro) {
+    const currentSites = await getSites();
+    if (!currentSites[domain]) {
+      currentSites[domain] = { mode: "unconstrained" };
+    }
+    // microCategory/macroCategory are the stored pair; the legacy
+    // `category` field is still *read* for old profiles but no longer
+    // written, so there is only one place holding this state.
+    currentSites[domain].microCategory = micro;
+    currentSites[domain].macroCategory = macro;
+    delete currentSites[domain].category;
+    await saveSites(currentSites);
+    invalidateClassificationCache();
+    sites = currentSites;
+    renderAll();
+  }
+
   function renderAuditTable(browsing) {
     if (!optDomainAuditTable) return;
     optDomainAuditTable.innerHTML = "";
@@ -453,36 +470,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     optDomainAuditTable.querySelectorAll(".audit-cat-select").forEach((select) => {
       select.addEventListener("change", async (e) => {
         const domain = e.target.dataset.domain;
-        let selectedMicro = e.target.value;
-        let selectedMacro = MICRO_TO_MACRO[selectedMicro] || "General";
+        const selectedMicro = e.target.value;
 
         if (selectedMicro === "__custom__") {
-          const customMicro = prompt(`Enter custom micro category for ${domain}:`, "Study");
-          if (!customMicro || !customMicro.trim()) {
-            renderAll();
-            return;
-          }
-          selectedMicro = customMicro.trim();
-          const customMacroInput = prompt(`Select Macro Category for ${selectedMicro} (Productivity, General, or Leisure):`, "Productivity");
-          if (customMacroInput && ["Productivity", "General", "Leisure"].includes(customMacroInput.trim())) {
-            selectedMacro = customMacroInput.trim();
-          }
+          openCustomCategoryModal(domain);
+          return;
         }
 
-        const currentSites = await getSites();
-        if (!currentSites[domain]) {
-          currentSites[domain] = { mode: "unconstrained" };
-        }
-        // microCategory/macroCategory are the stored pair; the legacy
-        // `category` field is still *read* for old profiles but no longer
-        // written, so there is only one place holding this state.
-        currentSites[domain].microCategory = selectedMicro;
-        currentSites[domain].macroCategory = selectedMacro;
-        delete currentSites[domain].category;
-        await saveSites(currentSites);
-        invalidateClassificationCache();
-        sites = currentSites;
-        renderAll();
+        await applyDomainCategory(domain, selectedMicro, MICRO_TO_MACRO[selectedMicro] || "General");
       });
     });
 
@@ -974,6 +969,70 @@ document.addEventListener("DOMContentLoaded", async () => {
       // A manual classification is authoritative everywhere, so re-render
       // the analytics surfaces too, not just this tab.
       await loadData();
+    });
+  }
+
+  // ---- Custom micro category modal (audit table "+ Custom Micro Category...") ----
+  // Replaces the old chain of window.prompt() calls, which accepted any
+  // free-text macro and silently defaulted it, same failure mode as the
+  // YouTube classify prompts above.
+  const customCategoryModal = document.getElementById("customCategoryModal");
+  const customCategoryForm = document.getElementById("customCategoryForm");
+  const customCategoryName = document.getElementById("customCategoryName");
+  const customCategoryError = document.getElementById("customCategoryError");
+  const customCategoryMacroSeg = document.getElementById("customCategoryMacroSeg");
+  const customCategoryCloseBtn = document.getElementById("customCategoryCloseBtn");
+  const customCategoryCancelBtn = document.getElementById("customCategoryCancelBtn");
+
+  let customCategoryDomain = null;
+  let customCategoryMacro = "General";
+
+  wireSegmented(customCategoryMacroSeg, (val) => {
+    customCategoryMacro = MACRO_ORDER.includes(val) ? val : "General";
+  });
+
+  function openCustomCategoryModal(domain) {
+    if (!customCategoryModal) return;
+    customCategoryDomain = domain;
+    customCategoryMacro = "General";
+    customCategoryName.value = "";
+    customCategoryError.style.display = "none";
+    customCategoryError.textContent = "";
+    if (customCategoryMacroSeg) {
+      customCategoryMacroSeg.querySelectorAll(".seg-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.getAttribute("data-value") === "General");
+      });
+    }
+    customCategoryModal.showModal();
+  }
+
+  function closeCustomCategoryModal() {
+    if (customCategoryModal) customCategoryModal.close();
+    customCategoryDomain = null;
+    // The select still shows "__custom__"; re-render so it reflects the
+    // domain's actual stored category again.
+    renderAll();
+  }
+
+  if (customCategoryCloseBtn) customCategoryCloseBtn.addEventListener("click", closeCustomCategoryModal);
+  if (customCategoryCancelBtn) customCategoryCancelBtn.addEventListener("click", closeCustomCategoryModal);
+
+  if (customCategoryForm) {
+    customCategoryForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!customCategoryDomain) return closeCustomCategoryModal();
+
+      const micro = customCategoryName.value.trim();
+      if (!micro) {
+        customCategoryError.textContent = "Enter a category name.";
+        customCategoryError.style.display = "block";
+        return;
+      }
+
+      const domain = customCategoryDomain;
+      customCategoryDomain = null;
+      if (customCategoryModal) customCategoryModal.close();
+      await applyDomainCategory(domain, micro, customCategoryMacro);
     });
   }
 

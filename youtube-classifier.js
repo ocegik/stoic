@@ -56,8 +56,21 @@
           registerContentService,
           invalidateClassificationCache,
           ClassifierRule,
+          dateKey,
         };
 
+  // NOTE: every one of these MUST be aliased, even the ones that look
+  // identical to their source name. In the browser/worker branch above,
+  // `common` is an object literal that reads bare identifiers like
+  // `registerClassifierRule` straight out of this file's enclosing scope
+  // (they're common.js's hoisted globals). If this destructuring bound a
+  // local `const registerClassifierRule` with that exact name, it would
+  // shadow the whole function scope from the top — including the object
+  // literal above — and reading it there throws "Cannot access
+  // 'registerClassifierRule' before initialization" (TDZ), which only
+  // ever surfaces in the browser: Node always takes the require() branch,
+  // so the object literal is dead code there and this never gets caught
+  // by the test suite.
   const {
     ClassificationContext: Ctx,
     ClassificationResult: Result,
@@ -66,10 +79,11 @@
     DEFAULT_MICRO_FOR_MACRO: DEFAULT_MICRO,
     todayStr: getTodayKey,
     getDomainTaxonomy: domainTaxonomy,
-    registerClassifierRule,
-    registerContentService,
-    invalidateClassificationCache,
+    registerClassifierRule: registerRule,
+    registerContentService: registerService,
+    invalidateClassificationCache: invalidateCache,
     ClassifierRule: BaseClassifierRule,
+    dateKey: toDateKey,
   } = common;
 
   // ==========================================================
@@ -323,7 +337,7 @@
 
   async function saveChannelStore(store) {
     channelStoreSnapshot = store && store.channels ? store : emptyChannelStore();
-    invalidateClassificationCache();
+    invalidateCache();
     if (hasChromeStorage()) {
       await chrome.storage.local.set({ [YT_CHANNELS_KEY]: channelStoreSnapshot });
     }
@@ -492,16 +506,24 @@
     ordered.slice(0, MAX_VIDEOS_RETAINED).forEach((k) => {
       pruned[k] = db[k];
     });
-    // Never prune a video the user explicitly classified.
+    // Never prune a video the user explicitly classified, or one last
+    // touched today — today's watch-time attribution keys (`v:<id>`) still
+    // need this record's channel to resolve to anything but the generic
+    // domain fallback, and that only stops mattering once the day rolls
+    // over and the attribution itself gets archived.
+    const today = getTodayKey();
     ordered.slice(MAX_VIDEOS_RETAINED).forEach((k) => {
-      if (db[k] && db[k].override) pruned[k] = db[k];
+      const video = db[k];
+      if (!video) return;
+      const touchedToday = video.updatedAt && toDateKey(new Date(video.updatedAt)) === today;
+      if (video.override || touchedToday) pruned[k] = video;
     });
     return pruned;
   }
 
   async function saveVideoDatabase(videos) {
     videoDbSnapshot = pruneVideoDatabase(videos || {});
-    invalidateClassificationCache();
+    invalidateCache();
     if (hasChromeStorage()) {
       await chrome.storage.local.set({ [YT_VIDEOS_KEY]: videoDbSnapshot });
     }
@@ -1124,7 +1146,7 @@
   // explicit channel classification outranks a blanket category on
   // youtube.com, while the rule itself still honours that site-level
   // override at step 4 of its chain.
-  registerClassifierRule(new YouTubeClassifierRule(), 10);
+  registerRule(new YouTubeClassifierRule(), 10);
 
   // ==========================================================
   // 9. Watch-time attribution
@@ -1270,7 +1292,7 @@
 
   // Registered with common.js so analytics can split YouTube time without
   // knowing anything about channels, videos, or predictions.
-  registerContentService({
+  registerService({
     name: "youtube",
     handlesDomain: isYouTubeDomain,
     resolveSegments: resolveYouTubeSegments,
@@ -1379,11 +1401,11 @@
       if (area !== "local") return;
       if (Object.prototype.hasOwnProperty.call(changes, YT_CHANNELS_KEY)) {
         channelStoreSnapshot = migrateChannelStore(changes[YT_CHANNELS_KEY].newValue);
-        invalidateClassificationCache();
+        invalidateCache();
       }
       if (Object.prototype.hasOwnProperty.call(changes, YT_VIDEOS_KEY)) {
         videoDbSnapshot = changes[YT_VIDEOS_KEY].newValue || {};
-        invalidateClassificationCache();
+        invalidateCache();
       }
       if (Object.prototype.hasOwnProperty.call(changes, AI_SETTINGS_KEY)) {
         inMemoryAISettings = { ...DEFAULT_AI_SETTINGS, ...(changes[AI_SETTINGS_KEY].newValue || {}) };

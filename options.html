@@ -545,6 +545,33 @@
     </div>
   </dialog>
 
+  <!-- Modal for assigning a custom micro category to a domain in the audit table -->
+  <dialog class="modal-dialog" id="customCategoryModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="customCategoryTitle">Custom Category</h3>
+        <button class="modal-close" id="customCategoryCloseBtn" type="button">&times;</button>
+      </div>
+      <form id="customCategoryForm" class="modal-body" novalidate>
+        <label for="customCategoryName" class="field-label">Micro category name</label>
+        <input class="field" id="customCategoryName" placeholder="e.g. Study" />
+        <div class="field-error" id="customCategoryError" style="display:none;"></div>
+
+        <label class="field-label" style="margin-top: 14px;">Macro category</label>
+        <div class="segmented" id="customCategoryMacroSeg">
+          <button class="seg-btn" type="button" data-value="Productivity">Productive</button>
+          <button class="seg-btn active" type="button" data-value="General">General Browsing</button>
+          <button class="seg-btn" type="button" data-value="Leisure">Leisure</button>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-ghost" type="button" id="customCategoryCancelBtn">Cancel</button>
+          <button class="btn-primary btn-accent" type="submit">Save Category</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
   <!-- Modal for Creating / Editing Discipline -->
   <dialog class="modal-dialog" id="optModal">
     <div class="modal-content">
