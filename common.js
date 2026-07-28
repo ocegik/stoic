@@ -1343,10 +1343,18 @@ function entryCategorySegments(domain, entry, dayKey, sites, totalSeconds) {
   return [{ macro, micro, seconds, sources: ["domain_rule"] }];
 }
 
+// Focus Score = Productive% - (Leisure% × 0.25).
+//
+// Productive time earns a point for every percentage point; General is
+// neutral (choosing it over Productive already costs you those points, so
+// it isn't docked again); Leisure is active distraction and applies a
+// small additional penalty on top of that natural opportunity cost. The
+// result is something a user can roughly estimate just from their
+// browsing distribution, without needing to know internal weights.
 function calculateFocusScore(sites, today = todayStr()) {
   let totalSeconds = 0;
-  let weightedSeconds = 0;
-  let trippedPenalty = 0;
+  let productiveSeconds = 0;
+  let leisureSeconds = 0;
 
   Object.keys(sites || {}).forEach((domain) => {
     const entry = sites[domain];
@@ -1354,40 +1362,26 @@ function calculateFocusScore(sites, today = todayStr()) {
     if (sec <= 0) return;
 
     totalSeconds += sec;
-    const mode = entry.mode || "unconstrained";
 
-    // Weigh each category segment on its own merits. An hour of YouTube is
-    // no longer one flat "leisure" hour — the part spent on a channel
-    // classified as productive is scored as productive.
+    // Segment each site by category on its own merits. An hour of YouTube
+    // is not one flat category — the part spent on a channel classified
+    // as productive counts as productive, etc.
     entryCategorySegments(domain, entry, today, sites, sec).forEach((segment) => {
-      const catWeight = getCategoryFocusWeight(segment.macro);
-      let segmentWeight = catWeight;
-
-      if (mode === "block") {
-        segmentWeight = 0.0;
-      } else if (mode === "limit") {
-        const limitSec = (limitMinutesForDate(entry, dateFromKey(today) || new Date()) || entry.limitMinutes || 30) * 60;
-        if (sec <= limitSec) {
-          segmentWeight = Math.max(catWeight, 0.7);
-        } else {
-          segmentWeight = Math.min(catWeight, 0.1);
-        }
+      if (segment.macro === "Productivity") {
+        productiveSeconds += segment.seconds;
+      } else if (segment.macro === "Leisure") {
+        leisureSeconds += segment.seconds;
       }
-
-      weightedSeconds += segment.seconds * segmentWeight;
     });
-
-    if (entry.lastReset === today && entry.timesTripped > 0) {
-      trippedPenalty += entry.timesTripped * 3;
-    }
   });
 
   if (totalSeconds === 0) return 100;
 
-  const baseRatio = weightedSeconds / totalSeconds;
-  const rawScore = Math.round(baseRatio * 100) - Math.min(25, trippedPenalty);
+  const productivePct = (productiveSeconds / totalSeconds) * 100;
+  const leisurePct = (leisureSeconds / totalSeconds) * 100;
+  const rawScore = productivePct - leisurePct * 0.25;
 
-  return Math.min(100, Math.max(10, rawScore));
+  return Math.min(100, Math.max(0, Math.round(rawScore)));
 }
 
 function generateQuickInsight(sites, today = todayStr()) {

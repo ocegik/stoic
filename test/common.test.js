@@ -160,7 +160,7 @@ test("analysis helpers: getTopSitesToday, calculateFocusScore, generateQuickInsi
   assert.equal(top[0].pctOfTotal, 75);
 
   const score = calculateFocusScore(sites, "2026-07-26");
-  assert.ok(score >= 10 && score <= 100);
+  assert.ok(score >= 0 && score <= 100);
 
   const insight = generateQuickInsight(sites, "2026-07-26");
   assert.match(insight, /youtube\.com/);
@@ -197,6 +197,28 @@ test("calculateFocusScore: dynamically varies based on usage distribution and re
   };
   const limitScore = calculateFocusScore(limitExceededSites, "2026-07-26");
   assert.ok(limitScore < prodScore, "Breaching limits should penalize the focus score");
+});
+
+test("calculateFocusScore: matches Productive% - (Leisure% x 0.25) formula", () => {
+  const { calculateFocusScore } = require("../common.js");
+
+  // github.com -> Productivity, amazon.com -> General, tiktok.com -> Leisure
+  const scoreFor = (productiveSec, generalSec, leisureSec) =>
+    calculateFocusScore(
+      {
+        "github.com": { mode: "unconstrained", usedSeconds: productiveSec, lastReset: "2026-07-26" },
+        "amazon.com": { mode: "unconstrained", usedSeconds: generalSec, lastReset: "2026-07-26" },
+        "tiktok.com": { mode: "unconstrained", usedSeconds: leisureSec, lastReset: "2026-07-26" },
+      },
+      "2026-07-26"
+    );
+
+  assert.equal(scoreFor(1000, 0, 0), 100, "100% productive should score 100");
+  assert.equal(scoreFor(800, 200, 0), 80, "80% productive, 20% general should score 80");
+  assert.equal(scoreFor(700, 100, 200), 65, "70/10/20 should score 65");
+  assert.equal(scoreFor(500, 0, 500), 38, "50% productive, 50% leisure should round to 38");
+  assert.equal(scoreFor(300, 400, 300), 23, "30/40/30 should round to 23");
+  assert.equal(scoreFor(0, 0, 1000), 0, "100% leisure should clamp to 0, not go negative");
 });
 
 test("separation of tracking vs moderation stats: getBrowsingStats & getModerationStats", () => {
