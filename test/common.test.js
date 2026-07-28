@@ -14,6 +14,7 @@ const {
   trailingWeekUsage,
   limitStreakDays,
   getDomainDisplayName,
+  usageSecondsForDate,
 } = require("../common.js");
 
 test("getDomainDisplayName: prefers recognized brands, otherwise uses leftmost label", () => {
@@ -125,6 +126,12 @@ test("trailingWeekUsage: combines six history days with today", () => {
       ["2026-07-26", 120],
     ]
   );
+});
+
+test("usageSecondsForDate: reads a past day still sitting in usedSeconds", () => {
+  const entry = { lastReset: "2026-07-27", usedSeconds: 600, history: [] };
+  assert.equal(usageSecondsForDate(entry, "2026-07-27", "2026-07-28"), 600);
+  assert.equal(usageSecondsForDate(entry, "2026-07-26", "2026-07-28"), 0);
 });
 
 test("limitStreakDays: counts quiet scheduled days within limit and skips off days", () => {

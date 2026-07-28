@@ -454,7 +454,12 @@ function getActiveRule(entry, date = new Date()) {
 
 function usageSecondsForDate(entry, key, today = todayStr()) {
   if (!entry) return 0;
-  if (key === today && entry.lastReset === today) return entry.usedSeconds || 0;
+  // An entry only rolls its counter into `history` when ensureReset() next runs
+  // for that domain, which happens lazily on the next visit. Settlement reads a
+  // day after it has ended, so a still-unrolled entry must be read straight off
+  // usedSeconds — keying on lastReset rather than on "is this today" is both more
+  // correct and identical in the common case.
+  if (entry.lastReset === key) return entry.usedSeconds || 0;
   const found = (entry.history || []).find((h) => h.date === key);
   return found ? found.seconds || 0 : 0;
 }
