@@ -34,18 +34,18 @@ only tokens that already exist."
 
 ### Session plan
 
-| Session | Phases | Notes |
-|---|---|---|
-| 1 | 0 + 1 | Precondition fix, then `progression-model.js`. **Write `test/progression-model.test.js` in this same session**, not in Phase 7 — the model is pure and untested arithmetic here poisons everything downstream. |
-| 2 | 2 + 3 | Store, then engine. Write `test/progression-engine.test.js` here too. |
-| 3 | 4 | `background.js` wiring. Small; verify by hand that the extension still loads and ticks. |
-| 4 | 5 | `progression-ui.js` + `progression.css`. Pure markup, no behaviour. |
-| 5 | 6.1 + 6.4 | Popup strip + manifest. Smallest surface first — proves the whole chain end to end. |
-| 6 | 6.2 | Options Progress tab, Preferences fields, export/import. Largest UI phase; give it its own session. |
-| 7 | 6.3 | Blocked page line. |
-| 8 | 7 | Fill any test gaps, then run the manual verification checklist. |
+| Session | Phases    | Notes                                                                                                                                                                                                          |
+| ------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | 0 + 1     | Precondition fix, then `progression-model.js`. **Write `test/progression-model.test.js` in this same session**, not in Phase 7 — the model is pure and untested arithmetic here poisons everything downstream. |
+| 2       | 2 + 3     | Store, then engine. Write `test/progression-engine.test.js` here too.                                                                                                                                          |
+| 3       | 4         | `background.js` wiring. Small; verify by hand that the extension still loads and ticks.                                                                                                                        |
+| 4       | 5         | `progression-ui.js` + `progression.css`. Pure markup, no behaviour.                                                                                                                                            |
+| 5       | 6.1 + 6.4 | Popup strip + manifest. Smallest surface first — proves the whole chain end to end.                                                                                                                            |
+| 6       | 6.2       | Options Progress tab, Preferences fields, export/import. Largest UI phase; give it its own session.                                                                                                            |
+| 7       | 6.3       | Blocked page line.                                                                                                                                                                                             |
+| 8       | 7         | Fill any test gaps, then run the manual verification checklist.                                                                                                                                                |
 
-Phase 7's test list is the *acceptance bar*, not the place to start testing.
+Phase 7's test list is the _acceptance bar_, not the place to start testing.
 Tests for a phase belong in that phase's session.
 
 ---
@@ -54,15 +54,29 @@ Tests for a phase belong in that phase's session.
 
 - [x] **Phase 0** — `usageSecondsForDate` fix + `test/common.test.js` case
 - [x] **Phase 1** — `progression-model.js` + `test/progression-model.test.js`
-- [ ] **Phase 2** — `progression-store.js`
-- [ ] **Phase 3** — `progression-engine.js` + `test/progression-engine.test.js`
-- [ ] **Phase 4** — `background.js` wiring (importScripts, 2 events, alarm, messages)
-- [ ] **Phase 5** — `progression-ui.js` + `progression.css`
+- [x] **Phase 2** — `progression-store.js`
+- [x] **Phase 3** — `progression-engine.js` + `test/progression-engine.test.js`
+- [x] **Phase 4** — `background.js` wiring (importScripts, 2 events, alarm, messages)
+- [x] **Phase 5** — `progression-ui.js` + `progression.css`
 - [ ] **Phase 6.1** — popup strip + level-up banner
 - [ ] **Phase 6.4** — `manifest.json` (web_accessible_resources, version 2.3.0)
 - [ ] **Phase 6.2** — options Progress tab + Preferences fields + export/import
 - [ ] **Phase 6.3** — blocked page "Turned back" cell
 - [ ] **Phase 7** — test gaps closed, manual checklist run
+
+**Note on Phase 4/5 verification.** `npm test` is green (193/193) and every file
+syntax-checks. `background.js`'s wiring was verified statically (all
+`importScripts` targets exist, `recordEvent`/`settleThrough`/`runSettlement`
+resolve, message handlers follow the existing async-response convention) —
+loading it interactively in `chrome://extensions` was not possible in the
+sandbox this session ran in (recent Chrome versions ignore the
+`--load-extension` command-line flag outside enterprise policy, and no OS
+accessibility permission was available to drive the native "Load unpacked"
+folder picker). But check again user might give permission manually, ask him. `progression-ui.js`'s render functions were smoke-tested under
+Node with fixture state/sites data (see the Session 3+4 report) rather than
+opened in a real popup/options page. Whoever runs Phase 6 should do the actual
+"load unpacked, open the popup" check once these functions are wired into a
+surface — nothing before Phase 6.1 renders anything on screen.
 
 ---
 

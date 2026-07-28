@@ -1,0 +1,517 @@
+/* ===== progression.css — the progression system's own styling =====
+   Loaded by popup.html and options.html, after tokens.css and
+   components.css. Every colour and spacing value here is one of the
+   existing custom properties from tokens.css — no new colour values, no new
+   fonts, matching 02-ARCHITECTURE.md §7 exactly. Classes are prefixed
+   `prog-` per the house naming rule (03-IMPLEMENTATION-SPEC.md preamble).
+*/
+
+/* ---- identity: level ring + rank + XP bar ---- */
+.prog-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.prog-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prog-ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.prog-ring-bg {
+  fill: none;
+  stroke: var(--bg-raised);
+  stroke-width: 6;
+}
+
+.prog-ring-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.prog-ring-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.prog-ring-level {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.prog-ring-sub {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.prog-identity-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.prog-rank-name {
+  font-size: 17.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.prog-rank-descriptor {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.prog-xp-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.prog-xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-soft), var(--accent));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.prog-xp-note {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 6px;
+  font-family: var(--mono);
+}
+
+/* ---- today's standing: three condition chips ---- */
+.prog-standing {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.prog-standing-absent {
+  display: block;
+}
+
+.prog-condition {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md, 14px);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-raised);
+}
+
+.prog-condition-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--text-faint);
+}
+
+.prog-condition-met {
+  border-color: var(--sem-green-border);
+  background: var(--sem-green-dim);
+}
+.prog-condition-met .prog-condition-dot { background: var(--sem-green); }
+
+.prog-condition-unmet {
+  border-color: var(--sem-red-border);
+  background: var(--sem-red-dim);
+}
+.prog-condition-unmet .prog-condition-dot { background: var(--sem-red); }
+
+.prog-condition-waived {
+  border-color: var(--sem-blue-border);
+  background: var(--sem-blue-dim);
+}
+.prog-condition-waived .prog-condition-dot { background: var(--sem-blue); }
+
+.prog-condition-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.prog-condition-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.prog-condition-value {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  font-family: var(--mono);
+}
+
+.prog-condition-empty {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  padding: 8px 0;
+}
+
+/* ---- streaks ---- */
+.prog-streaks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.prog-streak-pair {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.prog-streak-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md, 14px);
+}
+
+.prog-streak-value {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.prog-streak-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 6px;
+}
+
+.prog-rule-streaks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prog-rule-streak-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+
+.prog-rule-domain {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.prog-rule-streak-value {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---- contribution grid ---- */
+.prog-grid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.prog-grid-months {
+  position: relative;
+  height: 14px;
+  display: grid;
+  grid-template-columns: repeat(53, 11px);
+  gap: 3px;
+}
+
+.prog-grid-month {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.prog-grid {
+  display: grid;
+  grid-template-columns: repeat(53, 11px);
+  grid-template-rows: repeat(7, 11px);
+  gap: 3px;
+}
+
+.prog-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: var(--radius-xs, 6px);
+  background: var(--border-soft);
+}
+
+.prog-cell-held { background: var(--sem-green); }
+.prog-cell-partial { background: var(--sem-amber); }
+.prog-cell-missed { background: var(--sem-red-dim); }
+.prog-cell-absent { background: var(--border-soft); }
+
+.prog-grid-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-end;
+}
+
+.prog-grid-legend-lbl {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin: 0 4px;
+}
+
+/* ---- personal records ---- */
+.prog-records {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.prog-record-tile {
+  padding: 16px 18px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md, 14px);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.prog-record-tile:hover {
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+
+.prog-record-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 19px;
+  color: var(--text-primary);
+}
+
+.prog-record-label {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 5px;
+  font-weight: 600;
+}
+
+.prog-record-date {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-top: 4px;
+  font-family: var(--mono);
+}
+
+/* ---- achievements ---- */
+.prog-achievements {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.prog-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.prog-achievement-card {
+  padding: 16px 18px;
+  border-radius: var(--radius-md, 14px);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prog-achievement-earned {
+  border-left: 3px solid var(--sem-green);
+  background: var(--sem-green-dim);
+}
+
+.prog-achievement-locked {
+  opacity: 0.85;
+}
+
+.prog-achievement-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.prog-achievement-criterion {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.prog-achievement-meta {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+}
+
+.prog-achievement-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-panel);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.prog-achievement-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ---- popup strip ---- */
+.prog-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md, 14px);
+}
+
+.prog-strip-identity {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  flex: none;
+}
+
+.prog-strip-level {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.prog-strip-rank {
+  font-size: 9.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.prog-strip-xp {
+  flex: 1;
+  height: 6px;
+  min-width: 32px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.prog-strip-xp-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.prog-strip-dots {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+
+.prog-strip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-soft);
+  border: 1px solid var(--border);
+}
+
+.prog-dot-met { background: var(--sem-green); border-color: var(--sem-green); }
+.prog-dot-unmet { background: var(--sem-red); border-color: var(--sem-red); }
+.prog-dot-waived { background: var(--sem-blue); border-color: var(--sem-blue); }
+.prog-dot-absent { background: var(--border-soft); border-color: var(--border); }
+
+.prog-strip-streak {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  flex: none;
+}
+
+.prog-strip-streak-num {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.prog-strip-streak-lbl {
+  font-size: 9.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prog-ring-fill,
+  .prog-xp-bar-fill,
+  .prog-achievement-progress-fill,
+  .prog-strip-xp-fill,
+  .prog-record-tile {
+    transition: none;
+  }
+}

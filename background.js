@@ -26,9 +26,19 @@
 // suite can exercise it without a Chrome environment; the whole YouTube
 // classification subsystem lives in youtube-classifier.js, which must load
 // after common.js because it builds on the classification framework there.
-// Service workers can't use <script> tags, so pull them in with
-// importScripts.
-importScripts("common.js", "youtube-classifier.js", "background-logic.js");
+// The progression system's pure model, storage layer and orchestration
+// (progression-model.js / progression-store.js / progression-engine.js)
+// load last, in that order, since each references globals the previous one
+// installs (02-ARCHITECTURE.md §2). Service workers can't use <script>
+// tags, so pull them all in with importScripts.
+importScripts(
+  "common.js",
+  "youtube-classifier.js",
+  "background-logic.js",
+  "progression-model.js",
+  "progression-store.js",
+  "progression-engine.js"
+);
 
 const TICK_ALARM = "site-limiter-tick";
 
@@ -80,6 +90,13 @@ async function notifyThreshold(key, entry, pct, limitMinutes) {
 }
 
 async function navigateAfterTrip(tabId, key, entry, reason) {
+  // The gate being shown at all — regardless of which of the three reasons
+  // triggered it, and regardless of whether the user ends up redirected or
+  // shown the reality-check page — is a refusal candidate the moment the
+  // user backs away from it (01-PRODUCT-DESIGN.md §2.5). Record it before
+  // any navigation so the count is never lost to a tab that closes mid-trip.
+  await recordEvent("gate_shown", { domain: key, reason });
+
   if (entry.action === "redirect" && reason !== "restraint") {
     const dest = normalizeUrl(entry.redirectUrl);
     if (dest) {
@@ -186,13 +203,17 @@ async function tick() {
   if (entry.mode === "unconstrained") {
     creditUsage(elapsedSeconds);
     await saveSites(sites);
+    if (rolledOver) runSettlement(); // fire-and-forget: settle yesterday now that it's archived
     return;
   }
 
   const activeRule = getActiveRule(entry, new Date(now));
 
   if (!activeRule.active) {
-    if (rolledOver) await saveSites(sites); // persist a possible day-rollover
+    if (rolledOver) {
+      await saveSites(sites); // persist a possible day-rollover
+      runSettlement(); // fire-and-forget
+    }
     return;
   }
 
@@ -228,6 +249,7 @@ async function tick() {
   }
 
   await saveSites(sites);
+  if (rolledOver) runSettlement(); // fire-and-forget: settle yesterday now that it's archived
 
   if (tripReason) {
     activeState.domain = null; // stop crediting a tab we just blocked/redirected away from
@@ -250,10 +272,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = message.tabId || sender.tab?.id;
     grantRestraintPass(message.domain, message.durationMinutes || 15, tabId)
       .then((pass) => {
+        // The moment the friction gate is pushed through, not merely shown
+        // (01-PRODUCT-DESIGN.md §2.5) — recorded alongside the pass grant so
+        // settlement can reconcile gatesShown - gatesPassed into refusals.
+        recordEvent("gate_passed", { domain: message.domain });
         runTick();
         sendResponse({ success: true, pass });
       })
       .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === "PROGRESSION_EVENT") {
+    recordEvent(message.eventType, message.payload)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === "REQUEST_SETTLEMENT") {
+    runSettlement()
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
 
@@ -362,10 +402,19 @@ async function handleGetDebugInfo() {
 }
 
 const runTick = createCoalescingRunner(tick, (err) => console.error("[Stoic] tick failed", err));
+// Same coalescing guard as tick(): settlement is triggered from several
+// independent sources (a day rollover mid-tick, the periodic alarm, an
+// explicit REQUEST_SETTLEMENT message, worker startup) and must never run
+// twice concurrently against the same progression state.
+const runSettlement = createCoalescingRunner(settleThrough, (err) => console.error("[Stoic] settlement failed", err));
+
+const SETTLE_ALARM = "stoic-progression-settle";
 
 chrome.alarms.create(TICK_ALARM, { periodInMinutes: CHECK_INTERVAL_SECONDS / 60 });
+chrome.alarms.create(SETTLE_ALARM, { periodInMinutes: 30 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === TICK_ALARM) runTick();
+  if (alarm.name === SETTLE_ALARM) runSettlement();
 });
 
 chrome.tabs.onActivated.addListener(() => runTick());
@@ -386,10 +435,15 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.windows.onFocusChanged.addListener(() => runTick());
 
 // Prime the YouTube stores so the very first tick after the worker wakes
-// classifies against real data instead of an empty snapshot.
+// classifies against real data instead of an empty snapshot, then run tick
+// and settlement once so a browser that was closed for a while catches up
+// on both without waiting for the next alarm.
 ensureYouTubeStoresLoaded()
   .catch((err) => console.error("[Stoic] priming YouTube stores failed", err))
-  .finally(() => runTick());
+  .finally(() => {
+    runTick();
+    runSettlement();
+  });
 
 runTick();
 
