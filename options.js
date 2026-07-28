@@ -93,9 +93,179 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optModalEndTime = document.getElementById("optModalEndTime");
 
   const optModalRestraintRow = document.getElementById("optModalRestraintRow");
-  const optModalRestraintType = document.getElementById("optModalRestraintType");
-  const optModalCountdownGroup = document.getElementById("optModalCountdownGroup");
-  const optModalCountdownSec = document.getElementById("optModalCountdownSec");
+
+  // Friction Gate refs — the same wait/puzzle/reason challenge the
+  // restraint interstitial uses, applied here so Settings can never be an
+  // easier way to loosen or remove a rule than the blocked page is.
+  const fgModal = document.getElementById("frictionGateModal");
+  const fgTitle = document.getElementById("fgTitle");
+  const fgCopy = document.getElementById("fgCopy");
+  const fgWaitBar = document.getElementById("fgWaitBar");
+  const fgWaitVal = document.getElementById("fgWaitVal");
+  const fgPuzzleQuestion = document.getElementById("fgPuzzleQuestion");
+  const fgPuzzleInput = document.getElementById("fgPuzzleInput");
+  const fgPuzzleCheckBtn = document.getElementById("fgPuzzleCheckBtn");
+  const fgPuzzleProgress = document.getElementById("fgPuzzleProgress");
+  const fgPuzzleErr = document.getElementById("fgPuzzleErr");
+  const fgReasonInput = document.getElementById("fgReasonInput");
+  const fgReasonErr = document.getElementById("fgReasonErr");
+  const fgConfirmCheck = document.getElementById("fgConfirmCheck");
+  const fgConfirmBtn = document.getElementById("fgConfirmBtn");
+  const fgCancelBtn = document.getElementById("fgCancelBtn");
+  const fgCloseBtn = document.getElementById("fgCloseBtn");
+
+  // Runs the full friction gate and resolves true only if the user makes
+  // it through the wait, the puzzle streak, a genuine written reason, and
+  // an explicit final confirmation. Resolves false on cancel.
+  function requestFrictionGate({ title, copy }) {
+    return new Promise((resolve) => {
+      if (!fgModal) {
+        resolve(true);
+        return;
+      }
+
+      fgTitle.textContent = title || "Are you sure?";
+      fgCopy.textContent = copy || "This loosens a restriction you set up on purpose.";
+      fgConfirmCheck.checked = false;
+      fgReasonInput.value = "";
+      fgReasonErr.style.display = "none";
+      fgPuzzleErr.style.display = "none";
+      fgConfirmBtn.disabled = true;
+
+      const state = { waitDone: false, puzzleDone: false, reasonDone: false };
+      let streak = 0;
+      let currentPuzzle = generateHardPuzzle();
+      let remaining = RESTRAINT_WAIT_SECONDS;
+      let waitTimer = null;
+      let settled = false;
+
+      function updateConfirmEnabled() {
+        fgConfirmBtn.disabled = !(state.waitDone && state.puzzleDone && state.reasonDone && fgConfirmCheck.checked);
+      }
+
+      function renderPuzzle() {
+        fgPuzzleQuestion.textContent = currentPuzzle.question;
+        fgPuzzleProgress.innerHTML = Array.from({ length: RESTRAINT_PUZZLE_STREAK_REQUIRED })
+          .map((_, i) => `<span class="gate-dot ${i < streak ? "gate-dot-filled" : ""}"></span>`)
+          .join("");
+      }
+
+      function checkPuzzle() {
+        const val = Number(fgPuzzleInput.value);
+        if (fgPuzzleInput.value.trim() !== "" && val === currentPuzzle.answer) {
+          streak++;
+          fgPuzzleErr.style.display = "none";
+          if (streak >= RESTRAINT_PUZZLE_STREAK_REQUIRED) {
+            state.puzzleDone = true;
+            fgPuzzleInput.disabled = true;
+            renderPuzzle();
+            updateConfirmEnabled();
+            return;
+          }
+        } else {
+          streak = 0;
+          fgPuzzleErr.style.display = "block";
+        }
+        currentPuzzle = generateHardPuzzle();
+        renderPuzzle();
+        fgPuzzleInput.value = "";
+        fgPuzzleInput.focus();
+      }
+
+      function checkReason() {
+        const result = validateOpenReason(fgReasonInput.value);
+        state.reasonDone = result.valid;
+        fgReasonErr.style.display = result.valid ? "none" : "block";
+        fgReasonErr.textContent = result.message;
+        updateConfirmEnabled();
+      }
+
+      function tickWait() {
+        remaining--;
+        fgWaitVal.textContent = `${Math.max(0, remaining)}s`;
+        fgWaitBar.style.width = `${Math.round(((RESTRAINT_WAIT_SECONDS - remaining) / RESTRAINT_WAIT_SECONDS) * 100)}%`;
+        if (remaining <= 0) {
+          clearInterval(waitTimer);
+          state.waitDone = true;
+          updateConfirmEnabled();
+        }
+      }
+
+      function cleanup() {
+        clearInterval(waitTimer);
+        fgPuzzleInput.removeEventListener("keydown", onPuzzleKeydown);
+        fgPuzzleCheckBtn.removeEventListener("click", checkPuzzle);
+        fgReasonInput.removeEventListener("input", checkReason);
+        fgConfirmCheck.removeEventListener("change", updateConfirmEnabled);
+        fgConfirmBtn.removeEventListener("click", onConfirm);
+        fgCancelBtn.removeEventListener("click", onCancel);
+        fgCloseBtn.removeEventListener("click", onCancel);
+        fgPuzzleInput.disabled = false;
+      }
+
+      function settle(result) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        fgModal.close();
+        resolve(result);
+      }
+
+      function onConfirm() {
+        if (fgConfirmBtn.disabled) return;
+        settle(true);
+      }
+      function onCancel() {
+        settle(false);
+      }
+      function onPuzzleKeydown(e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          checkPuzzle();
+        }
+      }
+
+      fgWaitVal.textContent = `${remaining}s`;
+      fgWaitBar.style.width = "0%";
+      renderPuzzle();
+      fgPuzzleInput.disabled = false;
+      fgPuzzleInput.value = "";
+
+      waitTimer = setInterval(tickWait, 1000);
+      fgPuzzleInput.addEventListener("keydown", onPuzzleKeydown);
+      fgPuzzleCheckBtn.addEventListener("click", checkPuzzle);
+      fgReasonInput.addEventListener("input", checkReason);
+      fgConfirmCheck.addEventListener("change", updateConfirmEnabled);
+      fgConfirmBtn.addEventListener("click", onConfirm);
+      fgCancelBtn.addEventListener("click", onCancel);
+      fgCloseBtn.addEventListener("click", onCancel);
+
+      fgModal.showModal();
+    });
+  }
+
+  const MODE_STRICTNESS = { unconstrained: 0, limit: 1, restraint: 2, block: 3 };
+
+  // True when saving newEntry over oldEntry would reduce the friction the
+  // user previously set up — a weaker mode, a longer daily limit, or a
+  // narrower schedule. Used to decide whether an edit needs the gate.
+  function isLoosening(oldEntry, newEntry) {
+    if (!oldEntry || !oldEntry.mode || oldEntry.mode === "unconstrained") return false;
+    const oldRank = MODE_STRICTNESS[oldEntry.mode] ?? 0;
+    const newRank = MODE_STRICTNESS[newEntry.mode] ?? 0;
+    if (newRank < oldRank) return true;
+
+    if (newRank === oldRank && oldEntry.mode === "limit") {
+      if ((newEntry.limitMinutes || 0) > (oldEntry.limitMinutes || 0)) return true;
+    }
+
+    const oldSchedule = normalizeSchedule(oldEntry.schedule);
+    const newSchedule = normalizeSchedule(newEntry.schedule);
+    if (newSchedule.days.length < oldSchedule.days.length) return true;
+    if (oldSchedule.startTime && oldSchedule.endTime && (!newSchedule.startTime || !newSchedule.endTime)) return true;
+
+    return false;
+  }
 
   let modalMode = "limit";
 
@@ -120,13 +290,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     optModalLimitRow.style.display = val === "limit" ? "flex" : "none";
     if (optModalRestraintRow) optModalRestraintRow.style.display = val === "restraint" ? "flex" : "none";
   });
-
-  if (optModalRestraintType) {
-    optModalRestraintType.addEventListener("change", () => {
-      const showSec = optModalRestraintType.value === "countdown" || optModalRestraintType.value === "random";
-      if (optModalCountdownGroup) optModalCountdownGroup.style.display = showSec ? "flex" : "none";
-    });
-  }
 
   if (siteSearchInput) {
     siteSearchInput.addEventListener("input", (e) => {
@@ -418,8 +581,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else if (item.mode === "block") {
         statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:var(--sem-red-dim); color:var(--sem-red-soft); border:1px solid var(--sem-red-border);">RESTRAINT</span>`;
       } else if (item.mode === "restraint") {
-        const rLabel = (item.entry?.restraintType || "countdown").toUpperCase();
-        statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:rgba(2, 132, 199, 0.12); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.25);">${rLabel} RESTRAINT</span>`;
+        statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:rgba(2, 132, 199, 0.12); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.25);">RESTRAINT</span>`;
       }
 
       let categoryOptionsHtml = "";
@@ -522,10 +684,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         let ruleText = `${entry.limitMinutes || 30} min/day`;
         if (isBlock) ruleText = "Blocked full day";
-        else if (isRestraint) {
-          const rTypeStr = (entry.restraintType || "countdown").toUpperCase();
-          ruleText = `${rTypeStr} (${entry.countdownSeconds || 15}s)`;
-        }
+        else if (isRestraint) ruleText = "60s wait + puzzle + written reason";
 
         const rule = getActiveRule(entry);
         const usedSec = usageSecondsForDate(entry, todayStr());
@@ -568,16 +727,27 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         card.querySelector(".edit-btn").addEventListener("click", () => openModal(domain));
         card.querySelector(".pause-btn").addEventListener("click", async () => {
-          entry.paused = !entry.paused;
+          const pausing = !entry.paused;
+          if (pausing) {
+            const proceed = await requestFrictionGate({
+              title: `Pause restriction on ${displayName}?`,
+              copy: "Pausing turns this rule off just as completely as deleting it would, for as long as you leave it paused. Same gate applies.",
+            });
+            if (!proceed) return;
+          }
+          entry.paused = pausing;
           await saveSites(sites);
           renderAll();
         });
         card.querySelector(".delete-btn").addEventListener("click", async () => {
-          if (confirm(`Remove moderation rule for ${displayName}?`)) {
-            delete sites[domain];
-            await saveSites(sites);
-            renderAll();
-          }
+          const proceed = await requestFrictionGate({
+            title: `Remove moderation rule for ${displayName}?`,
+            copy: `You installed this rule for a reason. Deleting it removes ${displayName} from Stoic entirely — no limit, no restraint, no block.`,
+          });
+          if (!proceed) return;
+          delete sites[domain];
+          await saveSites(sites);
+          renderAll();
         });
 
         optDisciplinesGrid.appendChild(card);
@@ -621,8 +791,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       optModalDomain.disabled = true;
       modalMode = entry.mode === "unconstrained" ? "limit" : entry.mode;
       optModalMinutes.value = entry.limitMinutes || 30;
-      if (optModalRestraintType) optModalRestraintType.value = entry.restraintType || "countdown";
-      if (optModalCountdownSec) optModalCountdownSec.value = entry.countdownSeconds || 15;
 
       const schedule = normalizeSchedule(entry.schedule);
       optModalStartTime.value = schedule.startTime || "";
@@ -638,8 +806,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       optModalDomain.disabled = false;
       modalMode = "limit";
       optModalMinutes.value = "30";
-      if (optModalRestraintType) optModalRestraintType.value = "countdown";
-      if (optModalCountdownSec) optModalCountdownSec.value = "15";
       optModalStartTime.value = "";
       optModalEndTime.value = "";
       optModalDayPicker.querySelectorAll(".day-btn").forEach((btn) => btn.classList.add("active"));
@@ -651,9 +817,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     optModalLimitRow.style.display = modalMode === "limit" ? "flex" : "none";
     if (optModalRestraintRow) optModalRestraintRow.style.display = modalMode === "restraint" ? "flex" : "none";
-
-    const showSec = !optModalRestraintType || optModalRestraintType.value === "countdown" || optModalRestraintType.value === "random";
-    if (optModalCountdownGroup) optModalCountdownGroup.style.display = showSec ? "flex" : "none";
 
     optModal.showModal();
   }
@@ -689,16 +852,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     const limitMin = Number(optModalMinutes.value) || 30;
-    const rType = optModalRestraintType ? optModalRestraintType.value : "countdown";
-    const cSec = optModalCountdownSec ? (Math.max(5, Math.min(60, Number(optModalCountdownSec.value) || 15))) : 15;
     const existing = sites[rawDomain] || {};
 
-    sites[rawDomain] = {
+    const updatedEntry = {
       ...existing,
       mode: modalMode,
       limitMinutes: modalMode === "limit" ? limitMin : 0,
-      restraintType: modalMode === "restraint" ? rType : (existing.restraintType || "countdown"),
-      countdownSeconds: modalMode === "restraint" ? cSec : (existing.countdownSeconds || 15),
       schedule: {
         days: selectedDays,
         startTime: optModalStartTime.value || "",
@@ -706,6 +865,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       },
       createdAt: existing.createdAt || todayStr(),
     };
+
+    if (isLoosening(existing, updatedEntry)) {
+      const proceed = await requestFrictionGate({
+        title: `Loosen the rule for ${getDomainDisplayName(rawDomain)}?`,
+        copy: "You're about to reduce a restriction you set up on purpose. If it still matters, it'll survive one minute of thinking about it.",
+      });
+      if (!proceed) return;
+    }
+
+    sites[rawDomain] = updatedEntry;
 
     await saveSites(sites);
     closeModal();
@@ -772,6 +941,21 @@ document.addEventListener("DOMContentLoaded", async () => {
           throw new Error("Invalid Stoic backup file format.");
         }
 
+        const wouldLoosen = Object.keys(sites).some((domain) => {
+          const oldEntry = sites[domain];
+          if (!oldEntry || (oldEntry.mode !== "restraint" && oldEntry.mode !== "block")) return false;
+          const newEntry = payload.sites[domain] || { mode: "unconstrained" };
+          return isLoosening(oldEntry, newEntry) || (!oldEntry.paused && newEntry.paused);
+        });
+
+        if (wouldLoosen) {
+          const proceed = await requestFrictionGate({
+            title: "This import will loosen existing rules",
+            copy: "The file you picked would remove or weaken at least one restraint or block you already have set up. Importing it does the same thing deleting those rules would.",
+          });
+          if (!proceed) return;
+        }
+
         await saveSites(payload.sites);
         sites = payload.sites;
         renderAll();
@@ -787,7 +971,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (optResetAllBtn) {
     optResetAllBtn.addEventListener("click", async () => {
-      if (confirm("Are you sure you want to delete ALL site disciplines and clear usage history? This cannot be undone.")) {
+      const proceed = await requestFrictionGate({
+        title: "Delete every rule and all usage history?",
+        copy: "This is the single biggest escape hatch in the extension — every limit, restraint, and block you've set up, gone at once, along with your history. This cannot be undone.",
+      });
+      if (proceed) {
         sites = {};
         await saveSites(sites);
         renderAll();

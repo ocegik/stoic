@@ -108,10 +108,8 @@ async function navigateAfterTrip(tabId, key, entry, reason) {
     `blocked.html?site=${encodeURIComponent(key)}&reason=${encodeURIComponent(reason)}`
   );
   if (reason === "restraint") {
-    const rType = entry.restraintType || "countdown";
-    const rSec = entry.countdownSeconds || 15;
     url = chrome.runtime.getURL(
-      `blocked.html?site=${encodeURIComponent(key)}&reason=restraint&restraintType=${encodeURIComponent(rType)}&countdownSeconds=${rSec}&targetUrl=${encodeURIComponent(targetUrl)}`
+      `blocked.html?site=${encodeURIComponent(key)}&reason=restraint&targetUrl=${encodeURIComponent(targetUrl)}`
     );
   }
 

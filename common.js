@@ -220,9 +220,16 @@ function limitMinutesForDate(entry, date = new Date()) {
   return schedule.dayLimits[String(date.getDay())] || fallback;
 }
 
-const RESTRAINT_TYPES = ["countdown", "confirmation", "quote", "reflection", "math", "random"];
-const DEFAULT_RESTRAINT_TYPE = "countdown";
-const DEFAULT_COUNTDOWN_SECONDS = 15;
+// Restraint Mode used to let a site owner pick from five "challenge types"
+// of wildly uneven difficulty (a one-click quote acknowledgement was just as
+// valid as a math puzzle), which meant the actual friction of opening a
+// restrained site was whatever the weakest configured type allowed. That
+// defeated the point, so restraint is now a single, fixed, maximum-friction
+// gate: a mandatory wait, a genuinely hard puzzle, and a written reason.
+// Nothing here is user-configurable per site anymore.
+const RESTRAINT_WAIT_SECONDS = 60;
+const RESTRAINT_PUZZLE_STREAK_REQUIRED = 2;
+const RESTRAINT_MIN_REASON_WORDS = 12;
 
 const REFLECTION_QUESTIONS = [
   "Is opening this site helping your primary goal today?",
@@ -234,34 +241,80 @@ const REFLECTION_QUESTIONS = [
   "Could this time be better spent taking a real break away from screens?",
 ];
 
-function generateMathPuzzle() {
-  const num1 = Math.floor(Math.random() * 9) + 1;
-  const num2 = Math.floor(Math.random() * 9) + 1;
-  const operators = ["+", "-", "×"];
-  const op = operators[Math.floor(Math.random() * operators.length)];
-  let question = "";
-  let answer = 0;
-  if (op === "+") {
-    question = `${num1} + ${num2} = ?`;
-    answer = num1 + num2;
-  } else if (op === "-") {
-    const max = Math.max(num1, num2);
-    const min = Math.min(num1, num2);
-    question = `${max} - ${min} = ?`;
-    answer = max - min;
-  } else {
-    question = `${num1} × ${num2} = ?`;
-    answer = num1 * num2;
-  }
-  return { question, answer };
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function resolveRestraintType(configuredType) {
-  const validTypes = ["countdown", "confirmation", "quote", "reflection", "math"];
-  if (configuredType === "random") {
-    return validTypes[Math.floor(Math.random() * validTypes.length)];
+// Genuinely difficult, not "a few seconds" arithmetic: two-digit operands,
+// occasionally three chained terms, sized to require actual scratch-work
+// concentration rather than instant pattern recognition.
+function generateHardPuzzle() {
+  const variant = randomInt(1, 3);
+
+  if (variant === 1) {
+    // Three-term addition/subtraction chain, evaluated strictly left to
+    // right (the question is written unambiguously so there's no
+    // order-of-operations guessing involved).
+    const nums = [randomInt(12, 89), randomInt(12, 89), randomInt(12, 89)];
+    const ops = [Math.random() < 0.5 ? "+" : "-", Math.random() < 0.5 ? "+" : "-"];
+    let answer = nums[0];
+    let question = `${nums[0]}`;
+    for (let i = 0; i < ops.length; i++) {
+      question += ` ${ops[i]} ${nums[i + 1]}`;
+      answer = ops[i] === "+" ? answer + nums[i + 1] : answer - nums[i + 1];
+    }
+    return { question: `${question} = ?`, answer };
   }
-  return validTypes.includes(configuredType) ? configuredType : "countdown";
+
+  if (variant === 2) {
+    const a = randomInt(12, 89);
+    const b = randomInt(4, 9);
+    return { question: `${a} × ${b} = ?`, answer: a * b };
+  }
+
+  const a = randomInt(12, 29);
+  const b = randomInt(11, 19);
+  return { question: `${a} × ${b} = ?`, answer: a * b };
+}
+
+// Heuristic guard against low-effort "reasons" ("ok", "yes", ".", keyboard
+// mashing). It can't verify truthfulness, but it can force enough real
+// typed effort that reflexively clicking through stops being an option.
+function validateOpenReason(text) {
+  const raw = (text || "").trim();
+  if (!raw) {
+    return { valid: false, message: "Explain, in your own words, why you need this right now." };
+  }
+
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length < RESTRAINT_MIN_REASON_WORDS) {
+    return {
+      valid: false,
+      message: `Write at least ${RESTRAINT_MIN_REASON_WORDS} words (${words.length}/${RESTRAINT_MIN_REASON_WORDS} so far).`,
+    };
+  }
+
+  const wordish = words.filter((w) => /[a-zA-Z]{2,}/.test(w));
+  if (wordish.length / words.length < 0.7) {
+    return { valid: false, message: "That doesn't read like a real explanation. Use plain sentences." };
+  }
+
+  const vowelWords = wordish.filter((w) => /[aeiouAEIOU]/.test(w));
+  if (vowelWords.length / wordish.length < 0.6) {
+    return { valid: false, message: "That doesn't read like real words. Use plain sentences." };
+  }
+
+  const lowerWords = words.map((w) => w.toLowerCase());
+  const uniqueRatio = new Set(lowerWords).size / lowerWords.length;
+  if (uniqueRatio < 0.5) {
+    return { valid: false, message: "Too repetitive to count. Write a genuine, specific reason." };
+  }
+
+  if (/(.)\1{3,}/.test(raw.replace(/\s+/g, ""))) {
+    return { valid: false, message: "That looks like keyboard mashing, not an explanation." };
+  }
+
+  return { valid: true, message: "" };
 }
 
 const RESTRAINT_PASSES_KEY = "restraint_passes";
@@ -396,8 +449,6 @@ function getActiveRule(entry, date = new Date()) {
     withinHours,
     limitMinutes: limitMinutesForDate(entry, date),
     mode: entry?.mode || "unconstrained",
-    restraintType: entry?.restraintType || DEFAULT_RESTRAINT_TYPE,
-    countdownSeconds: cleanPositiveMinutes(entry?.countdownSeconds) || DEFAULT_COUNTDOWN_SECONDS,
   };
 }
 
@@ -1789,12 +1840,12 @@ const api = {
   getDailyComparison,
   getFocusScoreTheme,
   getModerationStats,
-  RESTRAINT_TYPES,
-  DEFAULT_RESTRAINT_TYPE,
-  DEFAULT_COUNTDOWN_SECONDS,
+  RESTRAINT_WAIT_SECONDS,
+  RESTRAINT_PUZZLE_STREAK_REQUIRED,
+  RESTRAINT_MIN_REASON_WORDS,
   REFLECTION_QUESTIONS,
-  generateMathPuzzle,
-  resolveRestraintType,
+  generateHardPuzzle,
+  validateOpenReason,
   RESTRAINT_PASSES_KEY,
   getRestraintPasses,
   saveRestraintPasses,

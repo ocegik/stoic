@@ -213,6 +213,27 @@
 }
 .callout-text + .callout-text { margin-top: 10px; }
 
+/* ---- friction gate steps (shared by the restraint interstitial and the
+   Settings friction gate — both present the same wait/puzzle/reason
+   challenge) ---- */
+.gate-step-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  align-self: flex-start;
+}
+.gate-puzzle-progress { display: flex; gap: 6px; }
+.gate-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-soft);
+  border: 1px solid var(--border);
+}
+.gate-dot-filled { background: var(--sem-green); border-color: var(--sem-green); }
+
 /* ---- toggle switch ---- */
 .switch {
   position: relative;

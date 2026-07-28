@@ -113,19 +113,18 @@ async function main() {
     `;
     equivalency.textContent = equivalencyFor(weeklyMinutes);
   } else if (reason === "restraint") {
-    const rawRestraintType = params.get("restraintType") || entry.restraintType || "countdown";
-    const countdownSec = Number(params.get("countdownSeconds")) || entry.countdownSeconds || 15;
     const targetUrl = params.get("targetUrl") || `https://${site}`;
+    const displayName = getDomainDisplayName(site);
 
     eyebrowStatus.textContent = "MINDFUL PAUSE · RESTRAINT MODE";
-    headline.textContent = `Reconsider opening ${getDomainDisplayName(site)}`;
-    subhead.innerHTML = `Stoic Restraint Mode is active for <span class="site">${site}</span>. Take a moment to reflect before proceeding.`;
+    headline.textContent = "You're about to throw away your focus again.";
+    subhead.innerHTML = `You installed Stoic because you knew a moment like this — reaching for <span class="site">${displayName}</span> — would come. Is this genuinely important, or just another dopamine hit? Every distraction here delays the work that actually moves your life forward.`;
     statRow.innerHTML = `
       <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times paused</div></div>
     `;
-    equivalency.textContent = "Intentionally pausing before opening a website breaks automatic habits.";
+    equivalency.textContent = "Restraint Mode isn't here to be convenient. It's here to make you decide on purpose, not on impulse.";
 
-    setupRestraintChallenge(site, rawRestraintType, countdownSec, targetUrl);
+    setupRestraintChallenge(site, targetUrl);
   } else {
     eyebrowStatus.textContent = "DISCIPLINE HELD · RESTRAINT";
     headline.textContent = "This one stays closed";
@@ -143,23 +142,67 @@ async function main() {
   setInterval(renderResetNote, 60000);
 }
 
-function setupRestraintChallenge(site, rawType, sec, destUrl) {
+// Restraint Mode is now a single fixed-difficulty gate: a mandatory 60s
+// wait, two hard puzzles solved back to back, and a genuinely written
+// reason — all three running concurrently, all three required before
+// Continue unlocks. There is no easier configuration to pick.
+function setupRestraintChallenge(site, destUrl) {
   const restraintBox = document.getElementById("restraintBox");
   const restraintBadge = document.getElementById("restraintBadge");
   const restraintWidget = document.getElementById("restraintWidget");
   const continueBtn = document.getElementById("continueBtn");
   const closeBtn = document.getElementById("closeBtn");
-  const placardBox = document.getElementById("placardBox");
 
   if (!restraintBox || !restraintWidget || !continueBtn) return;
 
   restraintBox.style.display = "flex";
   continueBtn.style.display = "inline-flex";
   continueBtn.disabled = true;
+  continueBtn.textContent = "Complete the steps below";
   if (closeBtn) closeBtn.textContent = "Go back";
+  if (restraintBadge) restraintBadge.textContent = "DELIBERATE FRICTION GATE";
 
-  const resolvedType = resolveRestraintType(rawType);
   const displayName = getDomainDisplayName(site);
+  const randomQ = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
+
+  restraintWidget.innerHTML = `
+    <div class="gate-step" id="gateTimerStep">
+      <div class="gate-step-label">1 · Wait it out — cannot be skipped</div>
+      <div class="countdown-timer-wrap">
+        <svg viewBox="0 0 90 90" class="countdown-svg">
+          <circle cx="45" cy="45" r="40" class="countdown-ring-bg" />
+          <circle cx="45" cy="45" r="40" class="countdown-ring-fill" id="countdownRing" />
+        </svg>
+        <span class="countdown-number" id="countdownVal">${RESTRAINT_WAIT_SECONDS}</span>
+      </div>
+    </div>
+
+    <div class="gate-step" id="gatePuzzleStep">
+      <div class="gate-step-label">2 · Solve ${RESTRAINT_PUZZLE_STREAK_REQUIRED} in a row</div>
+      <div class="math-puzzle-box">
+        <div class="math-question" id="puzzleQuestion"></div>
+        <input type="number" class="math-input" id="puzzleInput" placeholder="?" autofocus />
+        <div class="gate-puzzle-progress" id="puzzleProgress"></div>
+        <div class="field-error" id="puzzleErr" style="display:none;">Incorrect. Streak reset — new problem:</div>
+        <button type="button" class="btn-ghost" id="puzzleSubmitBtn" style="padding: 8px 16px;">Check Answer</button>
+      </div>
+    </div>
+
+    <div class="gate-step" id="gateReasonStep">
+      <div class="gate-step-label">3 · Answer honestly, in your own words</div>
+      <div class="reflection-box">
+        <div class="reflection-q">"${randomQ}"</div>
+        <textarea class="reflection-input" id="reasonInput" rows="3" placeholder="Write a real, specific reason (at least ${RESTRAINT_MIN_REASON_WORDS} words)..."></textarea>
+        <div class="field-error" id="reasonErr" style="display:none;"></div>
+      </div>
+    </div>
+  `;
+
+  const state = { timerDone: false, puzzleDone: false, reasonDone: false };
+
+  function maybeUnlock() {
+    if (state.timerDone && state.puzzleDone && state.reasonDone) unlockChallenge();
+  }
 
   function unlockChallenge() {
     continueBtn.disabled = false;
@@ -167,6 +210,101 @@ function setupRestraintChallenge(site, rawType, sec, destUrl) {
     continueBtn.classList.remove("btn-ghost");
     continueBtn.classList.add("btn-accent");
   }
+
+  // --- Step 1: mandatory, non-skippable wait ---
+  let rem = RESTRAINT_WAIT_SECONDS;
+  const circumference = 251.2;
+  const ringFill = document.getElementById("countdownRing");
+  const valEl = document.getElementById("countdownVal");
+
+  const timerInterval = setInterval(() => {
+    rem--;
+    if (valEl) valEl.textContent = rem > 0 ? rem : "0";
+    if (ringFill) {
+      const offset = circumference * (1 - rem / RESTRAINT_WAIT_SECONDS);
+      ringFill.style.strokeDashoffset = String(offset);
+    }
+    if (rem <= 0) {
+      clearInterval(timerInterval);
+      state.timerDone = true;
+      maybeUnlock();
+    }
+  }, 1000);
+
+  // --- Step 2: hard puzzle, streak required ---
+  let currentPuzzle = generateHardPuzzle();
+  let streak = 0;
+
+  function renderPuzzleProgress() {
+    const progress = document.getElementById("puzzleProgress");
+    if (!progress) return;
+    progress.innerHTML = Array.from({ length: RESTRAINT_PUZZLE_STREAK_REQUIRED })
+      .map((_, i) => `<span class="gate-dot ${i < streak ? "gate-dot-filled" : ""}"></span>`)
+      .join("");
+  }
+
+  function renderPuzzleQuestion() {
+    const qEl = document.getElementById("puzzleQuestion");
+    if (qEl) qEl.textContent = currentPuzzle.question;
+    renderPuzzleProgress();
+  }
+
+  renderPuzzleQuestion();
+
+  function checkPuzzle() {
+    const input = document.getElementById("puzzleInput");
+    const err = document.getElementById("puzzleErr");
+    if (!input) return;
+    const val = Number(input.value);
+    if (input.value.trim() !== "" && val === currentPuzzle.answer) {
+      streak++;
+      if (err) err.style.display = "none";
+      if (streak >= RESTRAINT_PUZZLE_STREAK_REQUIRED) {
+        state.puzzleDone = true;
+        input.disabled = true;
+        const btn = document.getElementById("puzzleSubmitBtn");
+        if (btn) btn.disabled = true;
+        renderPuzzleProgress();
+        maybeUnlock();
+        return;
+      }
+      currentPuzzle = generateHardPuzzle();
+      renderPuzzleQuestion();
+      input.value = "";
+      input.focus();
+    } else {
+      streak = 0;
+      currentPuzzle = generateHardPuzzle();
+      renderPuzzleQuestion();
+      input.value = "";
+      input.focus();
+      if (err) err.style.display = "block";
+    }
+  }
+
+  document.getElementById("puzzleSubmitBtn").addEventListener("click", checkPuzzle);
+  document.getElementById("puzzleInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      checkPuzzle();
+    }
+  });
+
+  // --- Step 3: genuine written reason ---
+  const reasonInput = document.getElementById("reasonInput");
+  const reasonErr = document.getElementById("reasonErr");
+
+  function checkReason() {
+    const result = validateOpenReason(reasonInput.value);
+    state.reasonDone = result.valid;
+    if (reasonErr) {
+      reasonErr.style.display = result.valid ? "none" : "block";
+      reasonErr.textContent = result.message;
+    }
+    if (result.valid) maybeUnlock();
+  }
+
+  reasonInput.addEventListener("input", checkReason);
 
   continueBtn.addEventListener("click", async () => {
     if (continueBtn.disabled) return;
@@ -206,148 +344,6 @@ function setupRestraintChallenge(site, rawType, sec, destUrl) {
 
     window.location.href = destUrl || `https://${site}`;
   });
-
-  if (resolvedType === "countdown") {
-    if (restraintBadge) restraintBadge.textContent = "COUNTDOWN RESTRAINT";
-    let rem = Math.max(5, Math.min(60, sec));
-    const circumference = 251.2;
-    restraintWidget.innerHTML = `
-      <div class="countdown-timer-wrap">
-        <svg viewBox="0 0 90 90" class="countdown-svg">
-          <circle cx="45" cy="45" r="40" class="countdown-ring-bg" />
-          <circle cx="45" cy="45" r="40" class="countdown-ring-fill" id="countdownRing" />
-        </svg>
-        <span class="countdown-number" id="countdownVal">${rem}</span>
-      </div>
-      <div style="font-size: 13px; color: var(--text-muted);">Pause for ${rem} seconds before continuing.</div>
-    `;
-
-    const ringFill = document.getElementById("countdownRing");
-    const valEl = document.getElementById("countdownVal");
-    const initialSec = rem;
-
-    const interval = setInterval(() => {
-      rem--;
-      if (valEl) valEl.textContent = rem > 0 ? rem : "0";
-      if (ringFill) {
-        const offset = circumference * (1 - rem / initialSec);
-        ringFill.style.strokeDashoffset = String(offset);
-      }
-      continueBtn.textContent = rem > 0 ? `Wait ${rem}s...` : `Continue to ${displayName}`;
-
-      if (rem <= 0) {
-        clearInterval(interval);
-        unlockChallenge();
-      }
-    }, 1000);
-
-  } else if (resolvedType === "confirmation") {
-    if (restraintBadge) restraintBadge.textContent = "TRIPLE CONFIRMATION";
-    const steps = [
-      { q: `Are you sure you want to open ${displayName}?`, btn: "Yes, I am sure →" },
-      { q: `Is this the best use of your attention right now?`, btn: "Yes, proceed →" },
-      { q: `Last chance: Will this bring value to your day?`, btn: "Complete Challenge →" },
-    ];
-    let curStep = 0;
-
-    function renderStep() {
-      const step = steps[curStep];
-      restraintWidget.innerHTML = `
-        <div class="confirmation-step-box">
-          <div style="font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase;">Step ${curStep + 1} of ${steps.length}</div>
-          <div class="confirm-question">${step.q}</div>
-          <button type="button" class="btn-ghost confirm-btn" id="confirmNextBtn">${step.btn}</button>
-        </div>
-      `;
-      document.getElementById("confirmNextBtn").addEventListener("click", () => {
-        curStep++;
-        if (curStep < steps.length) {
-          renderStep();
-        } else {
-          restraintWidget.innerHTML = `<div style="color: var(--sem-green); font-weight: 700; padding: 10px;">✓ Confirmation challenge completed!</div>`;
-          unlockChallenge();
-        }
-      });
-    }
-    renderStep();
-
-  } else if (resolvedType === "quote") {
-    if (restraintBadge) restraintBadge.textContent = "STOIC REFLECTION";
-    if (placardBox) placardBox.style.display = "block";
-    restraintWidget.innerHTML = `
-      <div style="font-size: 13.5px; color: var(--text-muted); text-align: center; margin: 6px 0;">Read the reflection below thoughtfully.</div>
-      <button type="button" class="btn-ghost" id="quoteAckBtn" style="padding: 8px 16px; font-size: 12.5px;">I have read & reflected</button>
-    `;
-    document.getElementById("quoteAckBtn").addEventListener("click", () => {
-      restraintWidget.innerHTML = `<div style="color: var(--sem-green); font-weight: 700; padding: 10px;">✓ Reflection acknowledged!</div>`;
-      unlockChallenge();
-    });
-
-  } else if (resolvedType === "reflection") {
-    if (restraintBadge) restraintBadge.textContent = "REFLECTION QUESTION";
-    const randomQ = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
-    restraintWidget.innerHTML = `
-      <div class="reflection-box">
-        <div class="reflection-q">"${randomQ}"</div>
-        <input type="text" class="reflection-input" id="reflectionInput" placeholder="Type a brief answer or intention..." />
-        <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
-          <button type="button" class="btn-ghost" id="reflectSubmitBtn" style="flex: 1; padding: 8px;">Submit Answer</button>
-        </div>
-      </div>
-    `;
-
-    const input = document.getElementById("reflectionInput");
-    const submitBtn = document.getElementById("reflectSubmitBtn");
-
-    function finishReflection() {
-      restraintWidget.innerHTML = `<div style="color: var(--sem-green); font-weight: 700; padding: 10px;">✓ Intention recorded!</div>`;
-      unlockChallenge();
-    }
-
-    submitBtn.addEventListener("click", () => finishReflection());
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") finishReflection();
-    });
-
-  } else if (resolvedType === "math") {
-    if (restraintBadge) restraintBadge.textContent = "MATH CHALLENGE";
-    let currentPuzzle = generateMathPuzzle();
-
-    function renderMath() {
-      restraintWidget.innerHTML = `
-        <div class="math-puzzle-box">
-          <div style="font-size: 12px; color: var(--text-muted);">Solve this quick problem to unlock:</div>
-          <div class="math-question">${currentPuzzle.question}</div>
-          <input type="number" class="math-input" id="mathInput" placeholder="?" autofocus />
-          <div id="mathErr" style="color: var(--sem-red); font-size: 11.5px; display: none;">Incorrect answer. Try this new question:</div>
-          <button type="button" class="btn-ghost" id="mathSubmitBtn" style="padding: 8px 16px;">Check Answer</button>
-        </div>
-      `;
-
-      const input = document.getElementById("mathInput");
-      const err = document.getElementById("mathErr");
-      const btn = document.getElementById("mathSubmitBtn");
-
-      function check() {
-        const val = Number(input.value);
-        if (val === currentPuzzle.answer) {
-          restraintWidget.innerHTML = `<div style="color: var(--sem-green); font-weight: 700; padding: 10px;">✓ Correct answer!</div>`;
-          unlockChallenge();
-        } else {
-          currentPuzzle = generateMathPuzzle();
-          renderMath();
-          const newErr = document.getElementById("mathErr");
-          if (newErr) newErr.style.display = "block";
-        }
-      }
-
-      btn.addEventListener("click", check);
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") check();
-      });
-    }
-    renderMath();
-  }
 }
 
 document.getElementById("closeBtn").addEventListener("click", async () => {

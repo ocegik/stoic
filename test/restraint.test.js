@@ -2,8 +2,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
-  generateMathPuzzle,
-  resolveRestraintType,
+  generateHardPuzzle,
+  validateOpenReason,
+  RESTRAINT_WAIT_SECONDS,
+  RESTRAINT_PUZZLE_STREAK_REQUIRED,
+  RESTRAINT_MIN_REASON_WORDS,
   REFLECTION_QUESTIONS,
   getActiveRule,
   grantRestraintPass,
@@ -12,55 +15,88 @@ const {
   normalizeDomain,
 } = require("../common.js");
 
-test("generateMathPuzzle: generates valid single-digit arithmetic puzzle and correct answer", () => {
-  for (let i = 0; i < 20; i++) {
-    const puzzle = generateMathPuzzle();
+// Left-to-right evaluator matching how generateHardPuzzle built the
+// question, used to verify the puzzle's stated answer independently of the
+// generator's own arithmetic.
+function evaluateLeftToRight(question) {
+  const cleaned = question.replace(/=\s*\?/, "").trim();
+  const tokens = cleaned.split(/\s+/);
+  let result = Number(tokens[0]);
+  for (let i = 1; i < tokens.length; i += 2) {
+    const op = tokens[i];
+    const num = Number(tokens[i + 1]);
+    if (op === "+") result += num;
+    else if (op === "-") result -= num;
+    else if (op === "×") result *= num;
+  }
+  return result;
+}
+
+test("generateHardPuzzle: generates genuinely harder (two-digit+) arithmetic with a correct answer", () => {
+  let sawMultiTerm = false;
+  let sawTwoDigitOperand = false;
+
+  for (let i = 0; i < 50; i++) {
+    const puzzle = generateHardPuzzle();
     assert.ok(puzzle.question.includes("="));
     assert.equal(typeof puzzle.answer, "number");
     assert.ok(!Number.isNaN(puzzle.answer));
+    assert.equal(evaluateLeftToRight(puzzle.question), puzzle.answer);
 
-    // Verify arithmetic evaluation
-    if (puzzle.question.includes("+")) {
-      const parts = puzzle.question.split("+").map((s) => parseInt(s.trim(), 10));
-      assert.equal(parts[0] + parts[1], puzzle.answer);
-    } else if (puzzle.question.includes("×")) {
-      const parts = puzzle.question.split("×").map((s) => parseInt(s.trim(), 10));
-      assert.equal(parts[0] * parts[1], puzzle.answer);
-    } else if (puzzle.question.includes("-")) {
-      const parts = puzzle.question.split("-").map((s) => parseInt(s.trim(), 10));
-      assert.equal(parts[0] - parts[1], puzzle.answer);
-    }
+    const operandCount = puzzle.question.split(/[+\-×]/).length;
+    if (operandCount > 2) sawMultiTerm = true;
+    if (/\b\d{2,}\b/.test(puzzle.question)) sawTwoDigitOperand = true;
   }
+
+  // Across enough samples we should see both the multi-term chains and
+  // two-digit operands that make this harder than the old single-digit
+  // "2 + 3 = ?" style puzzle.
+  assert.ok(sawMultiTerm, "expected at least one multi-term puzzle across samples");
+  assert.ok(sawTwoDigitOperand, "expected at least one two-digit operand across samples");
 });
 
-test("resolveRestraintType: resolves valid restraint types and handles 'random'", () => {
-  assert.equal(resolveRestraintType("countdown"), "countdown");
-  assert.equal(resolveRestraintType("confirmation"), "confirmation");
-  assert.equal(resolveRestraintType("quote"), "quote");
-  assert.equal(resolveRestraintType("reflection"), "reflection");
-  assert.equal(resolveRestraintType("math"), "math");
-  assert.equal(resolveRestraintType("invalid_type"), "countdown");
-
-  // Random selection should resolve to one of the 5 concrete types
-  const validConcreteTypes = ["countdown", "confirmation", "quote", "reflection", "math"];
-  for (let i = 0; i < 15; i++) {
-    const resolved = resolveRestraintType("random");
-    assert.ok(validConcreteTypes.includes(resolved));
-  }
+test("RESTRAINT_WAIT_SECONDS / RESTRAINT_PUZZLE_STREAK_REQUIRED: fixed, non-trivial friction", () => {
+  assert.equal(RESTRAINT_WAIT_SECONDS, 60);
+  assert.ok(RESTRAINT_PUZZLE_STREAK_REQUIRED >= 2);
 });
 
-test("getActiveRule: returns restraint configuration properties", () => {
+test("validateOpenReason: rejects low-effort responses", () => {
+  assert.equal(validateOpenReason("").valid, false);
+  assert.equal(validateOpenReason("ok").valid, false);
+  assert.equal(validateOpenReason("yes").valid, false);
+  assert.equal(validateOpenReason(".").valid, false);
+  assert.equal(validateOpenReason("asdf asdf asdf asdf asdf asdf asdf asdf asdf asdf asdf asdf").valid, false);
+  assert.equal(validateOpenReason("aaaa aaaa aaaa aaaa aaaa aaaa aaaa aaaa aaaa aaaa aaaa aaaa").valid, false);
+});
+
+test("validateOpenReason: accepts a genuine, specific explanation", () => {
+  const result = validateOpenReason(
+    "I need to check a work email thread about tomorrow's client meeting before I lose the context."
+  );
+  assert.equal(result.valid, true);
+});
+
+test("validateOpenReason: enforces the minimum word count", () => {
+  const distinctWords = [
+    "need", "to", "check", "an", "important", "work", "email", "before",
+    "the", "meeting", "starts", "this", "afternoon", "at", "the", "office",
+  ];
+
+  const tooFew = distinctWords.slice(0, RESTRAINT_MIN_REASON_WORDS - 1).join(" ");
+  assert.equal(validateOpenReason(tooFew).valid, false);
+
+  const enoughWords = distinctWords.slice(0, RESTRAINT_MIN_REASON_WORDS).join(" ");
+  assert.equal(validateOpenReason(enoughWords).valid, true);
+});
+
+test("getActiveRule: returns schedule/limit configuration properties", () => {
   const entry = {
     mode: "restraint",
-    restraintType: "math",
-    countdownSeconds: 20,
   };
 
   const rule = getActiveRule(entry);
   assert.equal(rule.active, true);
   assert.equal(rule.mode, "restraint");
-  assert.equal(rule.restraintType, "math");
-  assert.equal(rule.countdownSeconds, 20);
 });
 
 test("normalizeDomain: normalizes URLs, schemes, www, subdomains, ports, and paths", () => {
