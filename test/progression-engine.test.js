@@ -9,6 +9,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { defaultProgressionState } = require("../progression-store.js");
+const { MAX_LEDGER_DAYS, MAX_LEDGER_WEEKS, MAX_REFUSAL_DOMAINS } = require("../progression-model.js");
 const {
   buildDaySnapshot,
   gateCountersFor,
@@ -419,6 +420,68 @@ test("settleThroughState: resets `today` counters once the calendar day advances
   assert.deepEqual(next.today, { date: "2026-06-30", gatesShown: {}, gatesPassed: {} });
 });
 
+test("settleThroughState: prunes days beyond MAX_LEDGER_DAYS, keeping the newest and dropping the oldest", async () => {
+  const days = [];
+  for (let i = 0; i < MAX_LEDGER_DAYS + 10; i++) {
+    days.push({ d: `day-${i}`, t: 0, h: 0, a: 1, xp: 0, st: 0 });
+  }
+  const s = state({
+    settlement: { lastSettledDate: "2026-07-19", lastRunAt: null, lastWeekSettled: null },
+    today: { date: "2026-07-20", gatesShown: {}, gatesPassed: {} },
+    days,
+  });
+  const next = await settleThroughState(s, {}, "2026-07-20");
+  assert.equal(next.days.length, MAX_LEDGER_DAYS);
+  assert.equal(next.days[0].d, `day-10`, "the oldest 10 entries must be dropped, not the newest");
+  assert.equal(next.days[next.days.length - 1].d, `day-${MAX_LEDGER_DAYS + 9}`);
+});
+
+test("settleThroughState: prunes weeks beyond MAX_LEDGER_WEEKS, keeping the newest", async () => {
+  const weeks = [];
+  for (let i = 0; i < MAX_LEDGER_WEEKS + 5; i++) {
+    weeks.push({ w: `week-${i}`, held: 0, recorded: 0, xp: 0, tier: 0 });
+  }
+  const s = state({
+    settlement: { lastSettledDate: "2026-07-19", lastRunAt: null, lastWeekSettled: null },
+    today: { date: "2026-07-20", gatesShown: {}, gatesPassed: {} },
+    weeks,
+  });
+  const next = await settleThroughState(s, {}, "2026-07-20");
+  assert.equal(next.weeks.length, MAX_LEDGER_WEEKS);
+  assert.equal(next.weeks[0].w, `week-5`);
+});
+
+test("settleThroughState: prunes lifetime.refusalsByDomain to the MAX_REFUSAL_DOMAINS most-refused domains", async () => {
+  const refusalsByDomain = {};
+  for (let i = 0; i < MAX_REFUSAL_DOMAINS + 3; i++) {
+    refusalsByDomain[`site-${i}.example.com`] = i + 1; // higher index = more refusals
+  }
+  const s = state({
+    settlement: { lastSettledDate: "2026-07-19", lastRunAt: null, lastWeekSettled: null },
+    today: { date: "2026-07-20", gatesShown: {}, gatesPassed: {} },
+    lifetime: { ...defaultProgressionState().lifetime, refusalsByDomain },
+  });
+  const next = await settleThroughState(s, {}, "2026-07-20");
+  const kept = Object.keys(next.lifetime.refusalsByDomain);
+  assert.equal(kept.length, MAX_REFUSAL_DOMAINS);
+  // The three least-refused domains (site-0, site-1, site-2) must be dropped.
+  assert.ok(!("site-0.example.com" in next.lifetime.refusalsByDomain));
+  assert.ok(!("site-1.example.com" in next.lifetime.refusalsByDomain));
+  assert.ok(!("site-2.example.com" in next.lifetime.refusalsByDomain));
+  assert.equal(next.lifetime.refusalsByDomain[`site-${MAX_REFUSAL_DOMAINS + 2}.example.com`], MAX_REFUSAL_DOMAINS + 3);
+});
+
+test("settleThroughState: leaves lifetime.refusalsByDomain untouched when at or under the cap", async () => {
+  const refusalsByDomain = { "a.example.com": 3, "b.example.com": 1 };
+  const s = state({
+    settlement: { lastSettledDate: "2026-07-19", lastRunAt: null, lastWeekSettled: null },
+    today: { date: "2026-07-20", gatesShown: {}, gatesPassed: {} },
+    lifetime: { ...defaultProgressionState().lifetime, refusalsByDomain },
+  });
+  const next = await settleThroughState(s, {}, "2026-07-20");
+  assert.deepEqual(next.lifetime.refusalsByDomain, refusalsByDomain);
+});
+
 test("seedFirstDay: pulls the earliest date from createdAt, lastReset and history[].date alike", () => {
   const today = "2026-07-20";
   const sites = {
@@ -463,4 +526,39 @@ test("applyEvent: does not mutate the state object it was given", () => {
   const before = JSON.stringify(s);
   applyEvent(s, "gate_shown", { domain: "x.example.com" }, "2026-07-01");
   assert.equal(JSON.stringify(s), before);
+});
+
+test("applyEvent: level_up_seen flips the existing lastLevelUp flag and never touches level/xp (T2)", () => {
+  const s = state({
+    today: { date: "2026-07-01", gatesShown: {}, gatesPassed: {} },
+    level: { xp: 500, level: 5, rankId: "observer", lastLevelUp: { level: 5, at: "2026-06-30", seen: false } },
+  });
+  const next = applyEvent(s, "level_up_seen", {}, "2026-07-01");
+  assert.equal(next.level.lastLevelUp.seen, true);
+  assert.equal(next.level.xp, 500);
+  assert.equal(next.level.level, 5);
+});
+
+test("applyEvent: level_up_seen is a no-op when there is no pending level-up to dismiss", () => {
+  const s = state({ today: { date: "2026-07-01", gatesShown: {}, gatesPassed: {} }, level: { xp: 0, level: 1, rankId: "observer", lastLevelUp: null } });
+  const next = applyEvent(s, "level_up_seen", {}, "2026-07-01");
+  assert.equal(next.level.lastLevelUp, null);
+});
+
+test("applyEvent: config_updated writes clamped fields into state.config and leaves unspecified ones alone", () => {
+  const s = state({ today: { date: "2026-07-01", gatesShown: {}, gatesPassed: {} } });
+  const next = applyEvent(s, "config_updated", { leisureCeilingMinutes: 90 }, "2026-07-01");
+  assert.equal(next.config.leisureCeilingMinutes, 90);
+  assert.equal(next.config.focusTarget, s.config.focusTarget, "focusTarget was not part of the payload and must be untouched");
+
+  const next2 = applyEvent(next, "config_updated", { focusTarget: 75 }, "2026-07-01");
+  assert.equal(next2.config.leisureCeilingMinutes, 90, "the previous update must not be reverted");
+  assert.equal(next2.config.focusTarget, 75);
+});
+
+test("applyEvent: config_updated ignores non-numeric or missing fields rather than corrupting config", () => {
+  const s = state({ today: { date: "2026-07-01", gatesShown: {}, gatesPassed: {} } });
+  const before = JSON.stringify(s.config);
+  const next = applyEvent(s, "config_updated", { leisureCeilingMinutes: "90", focusTarget: null }, "2026-07-01");
+  assert.equal(JSON.stringify(next.config), before);
 });

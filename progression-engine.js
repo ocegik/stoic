@@ -26,6 +26,15 @@
 // Loaded the same two ways as every other classic script here:
 //   - background.js pulls it in with importScripts(...), last in the chain.
 //   - test/progression-engine.test.js require()s it directly under Node.
+//
+// Wrapped in an IIFE, same reason as progression-model.js/progression-store.js:
+// this file destructures a couple dozen names out of common.js/
+// progression-model.js/progression-store.js, every one of which is a
+// top-level lexical binding in its home file once loaded via importScripts.
+// Redeclaring any of them at this file's true top level is a hard
+// SyntaxError; a function scope shadows them locally instead, the same fix
+// youtube-classifier.js already relies on.
+(function () {
 
 const commonApi = typeof module !== "undefined" && module.exports ? require("./common.js") : self;
 const modelApi = typeof module !== "undefined" && module.exports ? require("./progression-model.js") : self;
@@ -63,6 +72,7 @@ const {
   MAX_LEDGER_DAYS,
   MAX_LEDGER_WEEKS,
   MAX_CATCHUP_DAYS,
+  MAX_REFUSAL_DOMAINS,
 } = modelApi;
 
 const { ensureYouTubeStoresLoaded } = youtubeApi;
@@ -483,6 +493,18 @@ async function settleThroughState(rawState, sites, todayKey) {
       delete working.streaks.rules[domain];
     }
   }
+  // refusalsByDomain is unbounded in principle (a new domain every visit,
+  // over years) — keep only the most-refused MAX_REFUSAL_DOMAINS entries,
+  // same shape of cap as days/weeks above (03-IMPLEMENTATION-SPEC.md §6.3).
+  const refusalDomains = Object.keys(working.lifetime.refusalsByDomain || {});
+  if (refusalDomains.length > MAX_REFUSAL_DOMAINS) {
+    const kept = refusalDomains
+      .sort((a, b) => working.lifetime.refusalsByDomain[b] - working.lifetime.refusalsByDomain[a])
+      .slice(0, MAX_REFUSAL_DOMAINS);
+    const prunedMap = {};
+    for (const domain of kept) prunedMap[domain] = working.lifetime.refusalsByDomain[domain];
+    working.lifetime.refusalsByDomain = prunedMap;
+  }
 
   return working;
 }
@@ -580,3 +602,5 @@ if (typeof module !== "undefined" && module.exports) {
 } else {
   Object.assign(self, progressionEngineApi);
 }
+
+})();

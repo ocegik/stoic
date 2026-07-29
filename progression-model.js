@@ -11,6 +11,15 @@
 //   - popup.html / options.html / blocked.html load it with a <script> tag,
 //     after common.js.
 //   - test/progression-model.test.js require()s it directly under Node.
+//
+// Wrapped in an IIFE for the same reason youtube-classifier.js is: common.js
+// declares its consts/functions lexically, which makes them visible here as
+// bare identifiers but NOT properties of the global object. Destructuring
+// any of those same names at true top level (as this file used to) is a
+// hard SyntaxError the moment a second script sharing that global scope
+// declares them too. A function scope lets this file shadow those names
+// locally without colliding with common.js or the other progression files.
+(function () {
 
 // dateKey/addDays/dateFromKey live in common.js. In the browser or worker
 // they're already globals by the time this file loads (common.js runs
@@ -49,6 +58,10 @@ const VIOLATION_TOLERANCE_SECONDS = 30; // absorbs tick granularity
 const MAX_LEDGER_DAYS = 400;
 const MAX_LEDGER_WEEKS = 120;
 const MAX_CATCHUP_DAYS = 400;
+// lifetime.refusalsByDomain is a small map, but unbounded in principle over
+// years of distinct domains (03-IMPLEMENTATION-SPEC.md §6.3) — capped the
+// same way days/weeks are, keeping only the most-refused domains.
+const MAX_REFUSAL_DOMAINS = 50;
 
 const RANKS = [
   { id: "observer", name: "Observer", minLevel: 1, descriptor: "You are watching your own behaviour." },
@@ -711,6 +724,7 @@ const progressionModelApi = {
   MAX_LEDGER_DAYS,
   MAX_LEDGER_WEEKS,
   MAX_CATCHUP_DAYS,
+  MAX_REFUSAL_DOMAINS,
   RANKS,
   cumulativeXpForLevel,
   levelForXp,
@@ -743,3 +757,5 @@ if (typeof module !== "undefined" && module.exports) {
 } else {
   Object.assign(self, progressionModelApi);
 }
+
+})();

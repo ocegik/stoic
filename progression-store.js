@@ -16,6 +16,13 @@
 // I2 (chrome.storage.local, unconditionally) and I1 (only the service
 // worker writes) both live in this file; nothing above or below it needs to
 // know the storage key or re-derive either invariant.
+//
+// Wrapped in an IIFE, same reason as progression-model.js/progression-engine.js:
+// `todayStr` and the progression-model constants below are top-level lexical
+// bindings (in common.js/progression-model.js respectively) once loaded via
+// importScripts, so redeclaring them at this file's true top level collides.
+// A function scope shadows them locally instead.
+(function () {
 
 const { todayStr } =
   typeof module !== "undefined" && module.exports ? require("./common.js") : self;
@@ -250,3 +257,5 @@ if (typeof module !== "undefined" && module.exports) {
 } else {
   Object.assign(self, progressionStoreApi);
 }
+
+})();
