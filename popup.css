@@ -1,25 +1,38 @@
-/* ===== popup.css — Stoic Quick Glance Control Panel ===== */
+/* ===== popup.css — the popup =====
+
+   The popup's job is a decision, not a report. Everything is ordered by how
+   likely it is to be the reason the user clicked the toolbar icon:
+
+     1. rule the site I'm looking at   (the only proactive moment)
+     2. where today went
+     3. the record
+
+   It was previously a read-only dashboard whose third element was a
+   developer debugger. See PRODUCT-AUDIT.md §3.2 and §5.5.
+*/
 
 body {
-  width: 352px;
+  width: 360px;
   margin: 0;
   padding: 0;
   background: var(--bg-panel);
   color: var(--text-primary);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
-  overflow: hidden;
 }
 
 .app {
   display: flex;
   flex-direction: column;
-  padding: 18px;
-  gap: 18px;
-  box-sizing: border-box;
+  padding: var(--space-4);
+  gap: var(--space-4);
+  /* The popup can grow (progression strip, level-up banner, an open form).
+     Chrome caps popups at 600px, so scroll inside rather than clipping. */
+  max-height: 580px;
+  overflow-y: auto;
 }
 
-/* Header */
+/* ---- top bar ---- */
 .topbar {
   display: flex;
   align-items: center;
@@ -29,232 +42,218 @@ body {
 .brand-group {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--space-2);
 }
 
-.brand-mark {
-  width: 25px;
-  height: 25px;
-  flex: none;
-}
-
-.brand-mark svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+.brand-mark { width: 15px; height: 15px; }
 
 .brand-title {
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--text-primary);
-}
-
-.topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .icon-btn {
   background: transparent;
   border: none;
-  color: var(--text-muted);
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
+  color: var(--text-faint);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: color 0.15s, background 0.15s;
+  transition: color var(--duration-fast) var(--ease),
+              background var(--duration-fast) var(--ease);
+}
+.icon-btn:hover { background: var(--bg-raised); color: var(--text-primary); }
+.icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* ---- the primary action ---- */
+.current-site {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-deep);
+  overflow: hidden;
 }
 
-.icon-btn:hover {
-  background: var(--bg-raised);
-  color: var(--text-primary);
-}
-
-.icon-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--accent-ring);
-}
-
-.icon-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Hero Overview: Today's Time & Daily Comparison & Circular Focus Score */
-.hero-overview {
+.cs-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 2px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
-.time-group {
+.cs-monogram {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cs-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+
+.cs-domain {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-meta {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-meta .cs-rule { color: var(--text-muted); }
+.cs-meta .cs-rule-limit { color: var(--partial-soft); }
+.cs-meta .cs-rule-restraint,
+.cs-meta .cs-rule-block { color: var(--missed-soft); }
+
+.cs-action {
+  flex: none;
+  padding: 7px 12px;
+  font-size: var(--text-sm);
+}
+
+.cs-note {
+  padding: 0 var(--space-4) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  line-height: var(--leading-normal);
+}
+
+/* the inline form — the whole point of the redesign */
+.cs-form {
+  border-top: 1px solid var(--border-soft);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-2);
+}
+.cs-form .segmented { margin-bottom: 0; }
+/* Three two-word labels in ~296px. `min-width: 0` is required — flex items
+   default to min-width:auto and would otherwise push the control past the
+   card's edge rather than wrapping. */
+.cs-form .seg-btn {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  padding: 7px 2px;
+  min-width: 0;
+  line-height: 1.2;
 }
 
-.hero-time-val {
-  font-size: 30px;
-  font-weight: 800;
+.cs-form-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-form-row label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  flex: none;
+}
+.cs-form-row .field { margin-bottom: 0; width: 84px; padding: 7px 10px; font-size: var(--text-base); }
+.cs-form-row .unit { font-size: var(--text-xs); color: var(--text-faint); font-family: var(--mono); }
+
+.cs-form-explainer {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  line-height: var(--leading-normal);
+}
+
+.cs-form-actions { display: flex; gap: var(--space-2); margin-top: 2px; }
+.cs-form-actions .btn-accent,
+.cs-form-actions .btn-ghost { flex: 1; padding: 9px 12px; font-size: var(--text-base); }
+
+/* ---- today ---- */
+.today-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.today-block { display: flex; flex-direction: column; gap: 3px; }
+.today-block-end { align-items: flex-end; }
+
+.today-val {
+  font-size: var(--text-2xl);
+  font-weight: 500;
   letter-spacing: -0.03em;
   color: var(--text-primary);
   line-height: 1;
 }
+.today-val.is-held { color: var(--held-soft); }
+.today-val.is-partial { color: var(--partial-soft); }
+.today-val.is-missed { color: var(--missed-soft); }
 
-.hero-time-lbl {
-  font-size: 11px;
-  font-weight: 500;
+.today-lbl {
+  font-size: var(--text-xs);
   color: var(--text-faint);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.04em;
 }
 
-.hero-time-comp {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 1px;
-}
+.today-skeleton { width: 72px; height: 24px; display: inline-block; }
+.focus-skeleton { width: 44px; height: 24px; display: inline-block; }
 
-.hero-time-comp.positive {
-  color: var(--sem-green-soft);
-}
-
-.hero-time-comp.negative {
-  color: var(--sem-amber-soft);
-}
-
-/* Circular Focus Score Gauge */
-.focus-gauge-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-}
-
-.focus-gauge-ring {
-  position: relative;
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.gauge-svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.gauge-bg {
-  fill: none;
-  stroke: var(--bg-raised);
-  stroke-width: 4.5;
-}
-
-.gauge-fill {
-  fill: none;
-  stroke-width: 4.5;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
-}
-
-.gauge-val {
-  position: absolute;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.gauge-lbl {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-/* Top 3 Websites Section */
-.top-sites-section {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
+/* ---- top sites ---- */
+.sites-section { display: flex; flex-direction: column; gap: var(--space-3); }
 
 .section-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-faint);
+  margin: 0;
 }
 
-.top-sites-list {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
+.top-sites-list { display: flex; flex-direction: column; gap: var(--space-3); }
 
-.site-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.site-row { display: flex; align-items: center; gap: var(--space-3); }
 
-.site-favicon-box {
+.site-monogram {
   width: 22px;
   height: 22px;
-  border-radius: 5px;
-  overflow: hidden;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-raised);
   flex: none;
 }
 
-.site-favicon {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
-}
+.site-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
-.favicon-fallback {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.site-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.site-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
+.site-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 
 .site-name {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 500;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -263,199 +262,124 @@ body {
 
 .site-time {
   font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   flex: none;
 }
 
 .progress-track {
-  height: 4.5px;
+  height: 3px;
   width: 100%;
   background: var(--bg-raised);
-  border-radius: 2.5px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--accent);
-  border-radius: 2.5px;
-  transition: width 0.3s ease;
+  background: var(--text-faint);
+  border-radius: 2px;
 }
 
-.empty-state {
-  font-size: 12px;
-  color: var(--text-faint);
-  padding: 8px 0;
-}
-
-/* Compact Behaviour Summary */
-.behaviour-summary {
+/* ---- the two ledger numbers ---- */
+.ledger-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px;
-  background: var(--bg-raised);
-  border-radius: 10px;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  text-align: center;
-}
-
-.stat-val {
-  font-size: 14.5px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.stat-val.positive {
-  color: var(--sem-green-soft);
-}
-
-.stat-lbl {
-  font-size: 9.5px;
-  font-weight: 500;
-  color: var(--text-faint);
-  margin-top: 1px;
-}
-
-.stat-divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border-soft);
-}
-
-/* Action Buttons */
-.action-buttons {
-  display: flex;
-  gap: 9px;
-}
-
-.btn-action {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7.5px 12px;
-  border-radius: 7px;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-action svg {
-  width: 13.5px;
-  height: 13.5px;
-}
-
-.btn-action.primary {
-  background: var(--accent);
-  color: #ffffff;
-  border: 1px solid transparent;
-}
-
-.btn-action.primary:hover {
-  filter: brightness(1.08);
-}
-
-.btn-action.secondary {
-  background: var(--bg-raised);
-  color: var(--text-primary);
-  border: 1px solid var(--border-soft);
-}
-
-.btn-action.secondary:hover {
-  background: var(--bg-panel);
-  border-color: var(--border);
-}
-
-.btn-action:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--accent-ring);
-}
-
-/* Classification Debugger */
-.debug-panel-wrapper {
-  margin-top: 10px;
-  background: var(--bg-raised);
-  border: 1px dashed var(--border-soft);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.debug-toggle-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-}
-
-.debug-toggle-btn svg {
-  width: 12px;
-  height: 12px;
-  flex: none;
-}
-
-.debug-toggle-btn:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--accent-ring);
-}
-
-.debug-badge {
-  margin-left: auto;
-  font-size: 9.5px;
-  font-weight: 700;
-  padding: 1.5px 6px;
-  border-radius: 4px;
-  background: var(--bg-panel);
-  color: var(--accent);
-  text-transform: uppercase;
-}
-
-.debug-content {
-  padding: 8px 10px 10px;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border-soft);
+}
+
+.ledger-item { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+.ledger-val {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.ledger-lbl { font-size: var(--text-xs); color: var(--text-faint); }
+
+.ledger-divider { width: 1px; height: 26px; background: var(--border-soft); margin: 0 var(--space-4); }
+
+/* ---- footer link ---- */
+.record-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease);
+}
+.record-link:hover { background: var(--bg-raised); color: var(--text-primary); border-color: var(--border); }
+.record-link:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
+.record-link svg { width: 15px; height: 15px; flex: none; }
+
+/* ---- first run ---- */
+.onboarding {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  min-height: 380px;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  gap: var(--space-4);
 }
 
-.debug-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10.5px;
-}
+.onboarding-body { flex: 1; }
 
-.debug-lbl {
-  color: var(--text-faint);
-  font-weight: 500;
-}
+.onboard-panel { display: flex; flex-direction: column; gap: var(--space-3); }
 
-.debug-val {
-  font-family: var(--mono);
-  color: var(--text-primary);
+.onboard-mark { width: 22px; height: 22px; margin-bottom: var(--space-1); }
+
+.onboard-title {
+  font-size: var(--text-xl);
   font-weight: 600;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--text-primary);
 }
 
+/* The product's own voice — one of the few places the serif appears. */
+.onboard-voice {
+  font-family: var(--serif);
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.onboard-body {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--text-muted);
+  margin: 0;
+}
+.onboard-body strong { color: var(--text-primary); font-weight: 600; }
+
+.onboard-slot { margin-top: var(--space-1); }
+
+.onboarding-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-soft);
+}
+
+.onboard-dots { display: flex; gap: 5px; }
+.onboard-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); }
+.onboard-dot.is-current { background: var(--text-muted); }
+
+.onboard-actions { display: flex; gap: var(--space-2); }
+.btn-sm { padding: 7px 14px; font-size: var(--text-base); }

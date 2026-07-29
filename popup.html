@@ -2,56 +2,81 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Stoic · Quick Glance Control Panel</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<title>Stoic</title>
 <link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="components.css" />
 <link rel="stylesheet" href="progression.css" />
 <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-<div class="app">
 
-  <!-- Top Bar -->
-  <div class="topbar">
-    <div class="brand-group">
-      <div class="brand-mark">
-        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <rect width="32" height="32" rx="8" fill="url(#stoic-brand-grad-popup)"/>
-          <path d="M7 9C7 8.44772 7.44772 8 8 8H24C24.5523 8 25 8.44772 25 9V10.5C25 10.7761 24.7761 11 24.5 11H7.5C7.22386 11 7 10.7761 7 10.5V9Z" fill="white"/>
-          <rect x="9.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
-          <rect x="14.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
-          <rect x="19.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
-          <path d="M7 23.5C7 23.2239 7.22386 23 7.5 23H24.5C24.7761 23 25 23.2239 25 23.5V24.5C25 25.0523 24.5523 25.5 24 25.5H8C7.44772 25.5 7 25.0523 7 24.5V23.5Z" fill="white"/>
-          <defs>
-            <linearGradient id="stoic-brand-grad-popup" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#0284c7"/>
-              <stop offset="1" stop-color="#0369a1"/>
-            </linearGradient>
-          </defs>
-        </svg>
+<!-- First run. Three panels, shown once, then never again. Until they are
+     dismissed the user sees nothing else — a dashboard of zeros is a worse
+     first impression than an explanation. -->
+<div class="onboarding" id="onboarding" hidden>
+  <div class="onboarding-body">
+    <section class="onboard-panel" data-step="1">
+      <div class="brand-mark onboard-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3H18V5.4H13.8V18.6H18V21H6V18.6H10.2V5.4H6Z"/></svg>
       </div>
-      <div class="brand-title">Stoic</div>
-    </div>
-    <div class="topbar-actions">
-      <button class="icon-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode" aria-label="Toggle Light / Dark Mode">
-        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="display:none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-      </button>
-    </div>
+      <h1 class="onboard-title">Stoic</h1>
+      <p class="onboard-voice">Sixty seconds before a site opens, and an honest record of where your attention actually went.</p>
+      <p class="onboard-body">Nothing here is designed to make you feel bad about a number. It measures what happened and it stops what you asked it to stop.</p>
+    </section>
+
+    <section class="onboard-panel" data-step="2" hidden>
+      <h1 class="onboard-title">Why it can see every site</h1>
+      <p class="onboard-body">To time a tab, Stoic has to read the address of the tab you are looking at. That is why Chrome asked for access to every site — there is no smaller permission that does it.</p>
+      <p class="onboard-body">It keeps a local time ledger for every domain you visit, so it can tell you where the day went. <strong>None of it leaves this machine.</strong> There is no account, no server, and nothing to sign in to.</p>
+    </section>
+
+    <section class="onboard-panel" data-step="3" hidden>
+      <h1 class="onboard-title">Start with one site</h1>
+      <p class="onboard-body">One rule is enough to begin. You can add more whenever a site earns one.</p>
+      <div id="onboardRuleSlot" class="onboard-slot"></div>
+    </section>
   </div>
 
-  <!-- Hero Overview: Today's Time & Daily Comparison & Circular Focus Score -->
-  <div class="hero-overview">
-    <div class="time-group">
-      <div class="hero-time-val" id="todayTotal">0m</div>
-      <div class="hero-time-lbl">Today's Browsing</div>
-      <div class="hero-time-comp" id="dailyComp">-- vs yesterday</div>
+  <div class="onboarding-footer">
+    <div class="onboard-dots" id="onboardDots" aria-hidden="true"></div>
+    <div class="onboard-actions">
+      <button class="btn-ghost btn-sm" id="onboardSkipBtn" type="button">Skip</button>
+      <button class="btn-accent btn-sm" id="onboardNextBtn" type="button">Next</button>
     </div>
-    <div class="focus-gauge-wrapper" id="focusGauge">
-      <!-- Circular progress gauge rendered dynamically -->
+  </div>
+</div>
+
+<!-- Hidden until boot decides between first run and the normal surface, so
+     neither one flashes the other. -->
+<div class="app" id="app" hidden>
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand-group">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3H18V5.4H13.8V18.6H18V21H6V18.6H10.2V5.4H6Z"/></svg>
+      </div>
+      <span class="brand-title">Stoic</span>
+    </div>
+    <button class="icon-btn" id="openSettingsBtn" type="button" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.35.4.63.73.79H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <!-- The primary action: rule the site you are actually looking at.
+       This is the only moment a user reaches for this product on purpose,
+       so it is the first and largest thing on the surface. -->
+  <div class="current-site" id="currentSite"></div>
+
+  <!-- Today, stated once, quietly -->
+  <div class="today-row" id="todayRow">
+    <div class="today-block">
+      <div class="today-val tabular" id="todayTotal"><span class="skeleton skeleton-line today-skeleton">&nbsp;</span></div>
+      <div class="today-lbl">Today</div>
+    </div>
+    <div class="today-block today-block-end">
+      <div class="today-val tabular" id="focusVal"><span class="skeleton skeleton-line focus-skeleton">&nbsp;</span></div>
+      <div class="today-lbl" id="focusLbl">Focus</div>
     </div>
   </div>
 
@@ -59,96 +84,31 @@
   <div id="progLevelUpBanner"></div>
   <div class="prog-strip" id="progStrip"></div>
 
-  <!-- Top 3 Websites Section -->
-  <div class="top-sites-section">
-    <div class="section-tag">TOP WEBSITES</div>
+  <section class="sites-section">
+    <h2 class="section-tag">Where today went</h2>
     <div class="top-sites-list" id="topSitesList"></div>
-  </div>
+  </section>
 
-  <!-- Compact Behaviour Summary -->
-  <div class="behaviour-summary">
-    <div class="stat-item">
-      <span class="stat-val" id="limitsTriggered">0</span>
-      <span class="stat-lbl">Limits Hit</span>
+  <!-- The two numbers worth carrying: how often you turned back, and how
+       many rules are standing. Not an estimate of time "saved". -->
+  <div class="ledger-row">
+    <div class="ledger-item">
+      <span class="ledger-val tabular" id="refusalsVal">—</span>
+      <span class="ledger-lbl">Turned back</span>
     </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-val" id="limitedSitesCount">0</span>
-      <span class="stat-lbl">Rules Active</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-val positive" id="timeSavedVal">0m</span>
-      <span class="stat-lbl">Time Saved</span>
+    <div class="ledger-divider"></div>
+    <div class="ledger-item">
+      <span class="ledger-val tabular" id="rulesVal">—</span>
+      <span class="ledger-lbl">Rules standing</span>
     </div>
   </div>
 
-  <!-- Primary Action Buttons -->
-  <div class="action-buttons">
-    <button class="btn-action primary" id="openDashboardBtn" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="9" rx="1"/>
-        <rect x="14" y="3" width="7" height="5" rx="1"/>
-        <rect x="14" y="12" width="7" height="9" rx="1"/>
-        <rect x="3" y="16" width="7" height="5" rx="1"/>
-      </svg>
-      Open Dashboard
-    </button>
-    <button class="btn-action secondary" id="manageRulesBtn" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-      </svg>
-      Manage Rules
-    </button>
-  </div>
+  <button class="record-link" id="openRecordBtn" type="button">
+    Open your record
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </button>
 
-  <!-- Developer / Classification Debugger (Collapsible) -->
-  <div class="debug-panel-wrapper">
-    <button class="debug-toggle-btn" id="debugToggleBtn" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
-      <span>Classification Debugger</span>
-      <span class="debug-badge" id="debugBadgeSource">Domain</span>
-    </button>
-    <div class="debug-content" id="debugContent" style="display: none;">
-      <div class="debug-row">
-        <span class="debug-lbl">Video ID:</span>
-        <span class="debug-val" id="dbgVideoId">--</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">Title:</span>
-        <span class="debug-val" id="dbgTitle">--</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">Channel:</span>
-        <span class="debug-val" id="dbgChannel">--</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">Content Type:</span>
-        <span class="debug-val" id="dbgContentType">--</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">Channel DB Lookup:</span>
-        <span class="debug-val" id="dbgChannelLookup">MISS</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">Cache Status:</span>
-        <span class="debug-val" id="dbgCacheStatus">MISS</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">Source:</span>
-        <span class="debug-val" id="dbgSource">domain_rule</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">Confidence:</span>
-        <span class="debug-val" id="dbgConfidence">80%</span>
-      </div>
-      <div class="debug-row">
-        <span class="debug-lbl">AI Rationale:</span>
-        <span class="debug-val" id="dbgReason">--</span>
-      </div>
-    </div>
-  </div>
-
+  <p class="status-message" id="popupStatus" role="status" aria-live="polite"></p>
 </div>
 
 <script src="common.js"></script>

@@ -1,113 +1,147 @@
 /* ===== components.css — shared components =====
-   Defined once here, then reused across popup.html and blocked.html.
-   Pages compose these with a page-specific class for sizing/spacing
-   (e.g. a button is both ".btn-accent" for its look and ".btn-primary"
-   or ".btn-close" for its layout), rather than each page redefining the
-   same visual pattern from scratch.
+   Defined once here, then reused across popup.html, options.html and
+   blocked.html. Pages compose these with a page-specific class for
+   sizing/spacing (e.g. a button is both ".btn-accent" for its look and
+   ".btn-primary" or ".btn-close" for its layout), rather than each page
+   redefining the same visual pattern from scratch.
+
+   House rules, applied throughout this file:
+   - Separation is a hairline, not a shadow.
+   - No gradients, no glows, no hover lifts. A hover state may change
+     colour; it may not move.
+   - Every interactive component covers default / hover / focus-visible /
+     active / disabled. Anything that can fail also has an error state.
 */
 
 /* ---- buttons ---- */
 .btn-accent {
-  background: linear-gradient(180deg, var(--accent-soft), var(--accent));
+  background: var(--accent);
   color: var(--accent-ink);
-  border: none;
-  border-radius: var(--radius-sm, 10px);
-  font-weight: 700;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
   font-family: var(--sans);
   cursor: pointer;
-  padding: 12px 20px;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.2);
+  padding: 11px 20px;
+  font-size: var(--text-md);
+  letter-spacing: -0.005em;
+  transition: background var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease);
 }
-.btn-accent:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.3);
-  filter: brightness(1.04);
+.btn-accent:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
 }
-.btn-accent:active {
-  transform: translateY(0);
-  filter: brightness(0.96);
+.btn-accent:active:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .btn-accent:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .btn-accent:disabled {
-  opacity: 0.55;
+  background: var(--bg-raised);
+  border-color: var(--border);
+  color: var(--text-faint);
   cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
 }
 
 .btn-ghost {
-  background: var(--bg-raised);
+  background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
-  border-radius: var(--radius-sm, 10px);
+  border-radius: var(--radius-sm);
   padding: 11px 18px;
-  font-size: 13px;
+  font-size: var(--text-base);
   font-weight: 600;
-  transition: all 0.2s ease;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease);
 }
-.btn-ghost:hover {
-  background: var(--bg-panel);
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-raised);
   color: var(--text-primary);
-  border-color: var(--accent-ring);
-  transform: translateY(-1px);
+  border-color: var(--text-faint);
 }
-.btn-ghost:active {
-  transform: translateY(0);
+.btn-ghost:active:not(:disabled) {
+  background: var(--bg-raised);
+  border-color: var(--border);
 }
 .btn-ghost:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A button that is doing something. The label is replaced by the caller;
+   this only removes the affordance while it is in flight. */
+.is-busy {
+  cursor: progress;
+  pointer-events: none;
+  opacity: 0.7;
+}
 
 /* ---- form fields ---- */
 .field {
   width: 100%;
-  background: var(--bg-raised);
+  background: var(--bg-panel);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: var(--radius-sm, 10px);
-  padding: 11px 14px;
-  font-size: 13.5px;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: var(--text-md);
   font-family: var(--sans);
-  margin-bottom: 12px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  margin-bottom: var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease),
+              box-shadow var(--duration-fast) var(--ease);
 }
+.field:hover:not(:disabled):not(:read-only) { border-color: var(--text-faint); }
 .field:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .field::placeholder { color: var(--text-faint); }
-.field.has-error { border-color: var(--error-border); }
+.field:disabled,
+.field[readonly] {
+  background: var(--bg-raised);
+  color: var(--text-faint);
+  cursor: not-allowed;
+  border-color: var(--border-soft);
+}
+.field.has-error { border-color: var(--missed); }
+.field.has-error:focus { box-shadow: 0 0 0 3px var(--missed-dim); }
 .field-error {
   display: none;
   color: var(--error);
-  font-size: 11.5px;
+  font-size: var(--text-sm);
   margin: -4px 0 10px 2px;
 }
 
 .field-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 .field-row label {
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-muted);
   flex: none;
-  width: 80px;
+  /* min-width, not width: "Leisure ceiling" must not be truncated at zoom */
+  min-width: 88px;
 }
 .field-row .field { margin-bottom: 0; }
 .field-row .unit {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-faint);
   flex: none;
   font-family: var(--mono);
@@ -118,108 +152,109 @@
   display: flex;
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md, 14px);
-  padding: 4px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  padding: 3px;
+  margin-bottom: var(--space-3);
 }
 .seg-btn {
   flex: 1;
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: var(--text-xs);
   font-family: var(--sans);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 9px 8px;
-  border-radius: var(--radius-sm, 10px);
-  transition: background 0.18s ease, color 0.18s ease, transform 0.15s ease;
+  letter-spacing: 0.06em;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease);
 }
+.seg-btn:hover:not(:disabled):not(.active) { color: var(--text-primary); }
 .seg-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--accent-ring);
 }
+.seg-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .seg-btn.active {
   background: var(--bg-panel);
-  color: var(--accent-soft);
-  box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0,0,0,0.04));
-  font-weight: 700;
+  color: var(--text-primary);
+  border: 1px solid var(--border-soft);
+  font-weight: 600;
 }
 
-/* ---- stat grid ---- */
+/* ---- stat grid ----
+   A stat cell is a reading, not a control. It has no hover state, because
+   it does nothing when you click it. */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 12px;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  overflow: visible;
+  gap: var(--space-3);
 }
 .stat-cell {
   background: var(--bg-panel);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md, 14px);
-  padding: 16px 18px;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-.stat-cell:hover {
-  border-color: var(--border);
-  transform: translateY(-1px);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
 }
 .stat-value {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: 500;
   color: var(--text-primary);
-  font-size: 20px;
-  line-height: 1.25;
+  font-size: var(--text-xl);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
 }
 .stat-label {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-top: 5px;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
   font-family: var(--sans);
-  font-weight: 600;
+  font-weight: 500;
 }
 
-/* ---- callout ---- */
+/* ---- callout / placard ----
+   Where the product speaks. Set in the serif; that is the whole point of
+   having a serif. */
 .callout {
   background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--accent);
-  border-radius: var(--radius-md, 14px);
-  padding: 20px 24px;
+  border: 1px solid var(--border-soft);
+  border-left: 2px solid var(--text-faint);
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-6);
   text-align: left;
-  box-shadow: var(--shadow-subtle, 0 2px 8px rgba(0,0,0,0.03));
 }
 .callout-label {
   font-family: var(--sans);
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--accent-soft);
-  margin-bottom: 8px;
+  color: var(--text-faint);
+  margin-bottom: var(--space-3);
 }
 .callout-text {
-  font-size: 14.5px;
+  font-family: var(--serif);
+  font-size: var(--text-lg);
   color: var(--text-primary);
-  line-height: 1.6;
-  font-weight: 450;
+  line-height: var(--leading-relaxed);
+  font-weight: 400;
 }
-.callout-text + .callout-text { margin-top: 10px; }
+.callout-text + .callout-text { margin-top: var(--space-3); }
 
-/* ---- friction gate steps (shared by the restraint interstitial and the
+/* ---- friction gate steps (shared by the restraint pause and the
    Settings friction gate — both present the same wait/puzzle/reason
    challenge) ---- */
 .gate-step-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-faint);
   align-self: flex-start;
@@ -229,10 +264,10 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--border-soft);
+  background: var(--bg-raised);
   border: 1px solid var(--border);
 }
-.gate-dot-filled { background: var(--sem-green); border-color: var(--sem-green); }
+.gate-dot-filled { background: var(--held); border-color: var(--held); }
 
 /* ---- toggle switch ---- */
 .switch {
@@ -260,42 +295,45 @@
   border-radius: 999px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: background var(--duration-base) var(--ease),
+              border-color var(--duration-base) var(--ease);
 }
 .switch-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
   background: var(--text-faint);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
+  transition: transform var(--duration-base) var(--ease),
+              background var(--duration-base) var(--ease);
 }
 .switch input:checked + .switch-track { background: var(--accent); border-color: var(--accent); }
 .switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); background: var(--accent-ink); }
 .switch input:focus-visible + .switch-track { box-shadow: 0 0 0 3px var(--accent-ring); }
 .switch input:disabled + .switch-track { opacity: 0.5; cursor: not-allowed; }
 .switch input:disabled { cursor: not-allowed; }
+/* A toggle that failed to save. The control has to be able to say so —
+   silently reverting is how a user stops trusting a settings page. */
+.switch.has-error .switch-track { border-color: var(--missed); background: var(--missed-dim); }
 
 /* ---- data table ---- */
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md, 14px);
+  border-radius: var(--radius-md);
 }
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: var(--text-base);
 }
 .table th {
   padding: 10px 14px;
   background: var(--bg-raised);
   color: var(--text-faint);
   font-weight: 600;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
   text-align: left;
   white-space: nowrap;
   border-bottom: 1px solid var(--border-soft);
@@ -308,6 +346,7 @@
 }
 .table tbody tr:last-child td { border-bottom: none; }
 .table tbody tr:hover { background: var(--bg-raised); }
+.table tbody tr:focus-within { background: var(--bg-raised); outline: 2px solid var(--accent-ring); outline-offset: -2px; }
 
 /* ---- day-of-week picker ---- */
 .day-picker {
@@ -319,24 +358,27 @@
   height: 34px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: var(--bg-raised);
+  background: transparent;
   color: var(--text-muted);
   font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease);
 }
-.day-btn:hover { border-color: var(--accent-ring); color: var(--text-primary); }
+.day-btn:hover:not(:disabled) { border-color: var(--text-faint); color: var(--text-primary); }
 .day-btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.day-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .day-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
 
 /* ---- disclosure (details/summary) ---- */
 .disclosure {
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm, 10px);
+  border-radius: var(--radius-sm);
   background: var(--bg-raised);
   overflow: hidden;
 }
@@ -344,22 +386,92 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
   cursor: pointer;
   list-style: none;
 }
 .disclosure summary::-webkit-details-marker { display: none; }
+.disclosure summary:hover { color: var(--text-primary); background: var(--bg-panel); }
+.disclosure summary:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent-ring);
+}
 .disclosure summary::after {
   content: "+";
   flex: none;
   color: var(--text-faint);
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: 600;
+  font-size: var(--text-lg);
 }
 .disclosure[open] summary::after { content: "\2212"; }
 .disclosure[open] summary { border-bottom: 1px solid var(--border-soft); }
 .disclosure > div { padding: 14px; }
+
+/* ---- empty state ----
+   A surface with no data yet must say what would appear here and why it
+   hasn't. A blank box is not an empty state. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-faint);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+.empty-state-title {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+.empty-state-body { max-width: 42ch; margin: 0 auto; }
+.empty-state-inline {
+  padding: var(--space-4) 0;
+  text-align: left;
+  align-items: flex-start;
+}
+.empty-state-inline .empty-state-body { margin: 0; }
+
+/* ---- loading ----
+   Async surfaces must not paint zeros first. On a product about honest
+   measurement, "0m · 100% focus" for a beat is not a cosmetic problem —
+   it is the product stating something untrue. */
+.skeleton {
+  display: block;
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+  color: transparent;
+  animation: skeleton-breathe 1.6s ease-in-out infinite;
+}
+.skeleton-line { height: 1em; width: 100%; }
+.skeleton-line + .skeleton-line { margin-top: 8px; }
+@keyframes skeleton-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+/* An element whose real value hasn't arrived yet. Reserves the space and
+   dims the placeholder instead of asserting a number. */
+.is-pending {
+  color: var(--text-faint);
+  opacity: 0.6;
+}
+
+/* ---- status message / live region ----
+   Save, sync and import results are announced. Writing them into a silent
+   <div> means a screen reader never hears that a save failed. */
+.status-message {
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+.status-message:empty { display: none; }
+.status-message.is-ok { background: var(--held-dim); border-color: var(--held-border); color: var(--held-soft); }
+.status-message.is-warn { background: var(--partial-dim); border-color: var(--partial-border); color: var(--partial-soft); }
+.status-message.is-error { background: var(--missed-dim); border-color: var(--missed-border); color: var(--missed-soft); }

@@ -21,6 +21,15 @@
 //     the checklist in 03-IMPLEMENTATION-SPEC.md, not with node --test
 //     (02-ARCHITECTURE.md §8). The module.exports tail still exists so this
 //     file follows the same convention as every other one in the codebase.
+//
+// Wrapped in an IIFE, same reason as progression-model.js/progression-store.js/
+// progression-engine.js: this file destructures names (dateKey, todayStr,
+// calculateFocusScore, ...) that are top-level lexical bindings in
+// common.js. Once common.js's <script> tag has run, redeclaring any of
+// those names at this file's true top level is a hard SyntaxError; a
+// function scope shadows them locally instead, the same fix
+// youtube-classifier.js already relies on.
+(function () {
 
 const commonApi = typeof module !== "undefined" && module.exports ? require("./common.js") : self;
 const modelApi = typeof module !== "undefined" && module.exports ? require("./progression-model.js") : self;
@@ -504,3 +513,5 @@ if (typeof module !== "undefined" && module.exports) {
 } else {
   Object.assign(self, progressionUiApi);
 }
+
+})();

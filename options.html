@@ -3,10 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Stoic — Browsing Analytics & Moderation Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>Stoic</title>
 <link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="components.css" />
 <link rel="stylesheet" href="progression.css" />
@@ -19,24 +16,11 @@
   <header class="options-header">
     <div class="header-brand">
       <div class="brand-mark">
-        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <rect width="32" height="32" rx="8" fill="url(#stoic-brand-grad-opt)"/>
-          <path d="M7 9C7 8.44772 7.44772 8 8 8H24C24.5523 8 25 8.44772 25 9V10.5C25 10.7761 24.7761 11 24.5 11H7.5C7.22386 11 7 10.7761 7 10.5V9Z" fill="white"/>
-          <rect x="9.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
-          <rect x="14.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
-          <rect x="19.5" y="12.5" width="3" height="9.5" rx="1.5" fill="white" fill-opacity="0.95"/>
-          <path d="M7 23.5C7 23.2239 7.22386 23 7.5 23H24.5C24.7761 23 25 23.2239 25 23.5V24.5C25 25.0523 24.5523 25.5 24 25.5H8C7.44772 25.5 7 25.0523 7 24.5V23.5Z" fill="white"/>
-          <defs>
-            <linearGradient id="stoic-brand-grad-opt" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#0284c7"/>
-              <stop offset="1" stop-color="#0369a1"/>
-            </linearGradient>
-          </defs>
-        </svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3H18V5.4H13.8V18.6H18V21H6V18.6H10.2V5.4H6Z"/></svg>
       </div>
       <div>
         <h1 class="header-title">Stoic</h1>
-        <p class="header-subtitle">Browsing Analytics & Moderation</p>
+        <p class="header-subtitle">Where your attention went, and what you asked to be stopped from.</p>
       </div>
     </div>
   </header>
@@ -44,35 +28,35 @@
   <!-- Navigation Tabs -->
   <nav class="options-nav" role="tablist">
     <button class="nav-tab active" data-target="tab-overview" role="tab" aria-selected="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       Overview
     </button>
     <button class="nav-tab" data-target="tab-progress" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
       Progress
     </button>
     <button class="nav-tab" data-target="tab-analysis" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Detailed Analysis
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Analysis
     </button>
     <button class="nav-tab" data-target="tab-categories" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       Categories
     </button>
     <button class="nav-tab" data-target="tab-rules" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Rules
     </button>
     <button class="nav-tab" data-target="tab-youtube-debug" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
-      YouTube & Debugger
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.5 15 12l-5 2.5z"/></svg>
+      YouTube
     </button>
     <button class="nav-tab" data-target="tab-sync" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Preferences
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
     </button>
     <button class="nav-tab" data-target="tab-backup" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Backup
     </button>
   </nav>
@@ -87,7 +71,7 @@
       <div class="hero-anchor-section">
         <div class="hero-primary">
           <div class="hero-primary-val" id="optTodayTotal">0m</div>
-          <div class="hero-primary-lbl">Today's Browsing Time</div>
+          <div class="hero-primary-lbl">Tracked today</div>
         </div>
 
         <!-- Focus Score Component -->
@@ -101,32 +85,32 @@
           </div>
           <div class="focus-score-info">
             <div class="focus-score-title">Focus Score</div>
-            <div class="focus-score-sub" id="optFocusScoreSub">High Restraint</div>
+            <div class="focus-score-sub" id="optFocusScoreSub">—</div>
           </div>
         </div>
       </div>
 
       <!-- TOP WEBSITES SECTION (Part 4 Compact Rows) -->
       <div class="overview-section">
-        <h2 class="overview-section-title">Top Websites</h2>
+        <h2 class="overview-section-title">Where today went</h2>
         <div class="top-websites-list" id="optTopWebsitesList"></div>
       </div>
 
       <!-- BEHAVIOUR SUMMARY SECTION (Part 4 Compact Metrics Row) -->
       <div class="overview-section">
-        <h2 class="overview-section-title">Behaviour Summary</h2>
+        <h2 class="overview-section-title">The two numbers worth carrying</h2>
         <div class="overview-behaviour-row">
           <div class="compact-metric-item">
-            <span class="compact-metric-val" id="optOverviewTrippedCount">0</span>
-            <span class="compact-metric-lbl">Limits Triggered</span>
+            <span class="compact-metric-val" id="optOverviewRefusals">0</span>
+            <span class="compact-metric-lbl">Times you turned back, all time</span>
           </div>
           <div class="compact-metric-item">
             <span class="compact-metric-val" id="optOverviewRulesActive">0</span>
-            <span class="compact-metric-lbl">Rules Active</span>
+            <span class="compact-metric-lbl">Rules standing</span>
           </div>
           <div class="compact-metric-item">
-            <span class="compact-metric-val positive" id="optOverviewTimeSaved">0m</span>
-            <span class="compact-metric-lbl">Time Saved</span>
+            <span class="compact-metric-val" id="optOverviewTrippedCount">0</span>
+            <span class="compact-metric-lbl">Times a rule stopped you today</span>
           </div>
         </div>
       </div>
@@ -180,8 +164,8 @@
         <div class="card card-secondary">
           <div class="card-header-flex">
             <div>
-              <h3>7-Day Browsing Time Distribution</h3>
-              <p class="card-desc">Daily comparison of active browsing duration over the past week</p>
+              <h3>The last seven days</h3>
+              <p class="card-desc">How much time each day carried. No target, no trend line — just the week as it happened.</p>
             </div>
           </div>
           <div class="analytics-chart" id="optAnalyticsChart"></div>
@@ -191,8 +175,8 @@
         <div class="card card-secondary">
           <div class="card-header-flex">
             <div>
-              <h3>Websites Visited Audit & Quick Moderation</h3>
-              <p class="card-desc">Detailed domain analytics and rule quick-actions</p>
+              <h3>Every site you visited today</h3>
+              <p class="card-desc">Everything tracked today, with a rule one click away.</p>
             </div>
           </div>
           <div id="optDomainAuditTable" class="table-wrapper"></div>
@@ -209,8 +193,8 @@
         <div class="card card-secondary">
           <div class="card-header-flex">
             <div>
-              <h3>Category Breakdown</h3>
-              <p class="card-desc">Distribution of time spent across activity types</p>
+              <h3>How the day split</h3>
+              <p class="card-desc">Productive, general and leisure time, as classified today.</p>
             </div>
           </div>
           <div class="category-grid" id="optCategoryGrid"></div>
@@ -224,27 +208,23 @@
       <div class="dashboard-section">
         <div class="panel-header">
           <div>
-            <h2 class="section-title">Moderation Rules & Adherence</h2>
-            <p class="panel-desc">Monitors configured site limits and restraint rules.</p>
+            <h2 class="section-title">Rules</h2>
+            <p class="panel-desc">Everything you have asked to be stopped from. Loosening any of these costs the same sixty seconds as pushing through one.</p>
           </div>
-          <button class="btn-primary btn-accent" id="optAddSiteBtn" type="button">+ New Moderation Rule</button>
+          <button class="btn-primary btn-accent" id="optAddSiteBtn" type="button">New rule</button>
         </div>
 
         <!-- Moderation Performance Summary -->
         <div class="card card-secondary">
-          <h3>Moderation Performance Summary</h3>
+          <h3>How the rules held</h3>
           <div class="mod-performance-grid">
             <div class="perf-cell">
               <div class="perf-val" id="optModLimitedCount">0</div>
-              <div class="perf-lbl">Limited Sites</div>
+              <div class="perf-lbl">Rules standing</div>
             </div>
             <div class="perf-cell">
               <div class="perf-val" id="optModTrippedCount">0</div>
-              <div class="perf-lbl">Limits Triggered Today</div>
-            </div>
-            <div class="perf-cell">
-              <div class="perf-val positive" id="optModTimeSaved">0m</div>
-              <div class="perf-lbl">Est. Time Saved</div>
+              <div class="perf-lbl">Times a rule stopped you today</div>
             </div>
           </div>
         </div>
@@ -253,8 +233,8 @@
         <div class="card">
           <div class="card-header-flex">
             <div>
-              <h3>Rule Adherence Streaks</h3>
-              <p class="card-desc">Consecutive days browsing within configured limits</p>
+              <h3>Days in a row</h3>
+              <p class="card-desc">How long each rule has held without being broken.</p>
             </div>
           </div>
           <div class="streaks-list" id="optStreaksList"></div>
@@ -281,13 +261,13 @@
     <!-- TAB 5: PREFERENCES & SYNC -->
     <section class="tab-panel" id="tab-sync" role="tabpanel" hidden>
       <div class="dashboard-section">
-        <h2 class="section-title">Storage & Synchronization</h2>
+        <h2 class="section-title">Settings</h2>
 
         <div class="card settings-card">
           <div class="settings-row-large">
             <div class="settings-info">
-              <h3>Chrome Device Sync</h3>
-              <p>Sync your site disciplines across signed-in Chrome browsers using your Google account.</p>
+              <h3>Sync across your Chromes</h3>
+              <p>Keep your rules on every Chrome you are signed in to. Your time record always stays on this machine.</p>
               <div class="sync-quota-badge">Chrome Sync Storage Limit: 8 KB per item</div>
             </div>
             <label class="switch" for="optSyncToggle">
@@ -295,14 +275,14 @@
               <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
             </label>
           </div>
-          <div class="settings-note" id="optSyncNote" hidden></div>
+          <div class="settings-note" id="optSyncNote" role="status" aria-live="polite" hidden></div>
         </div>
 
         <div class="card settings-card">
-          <h3>Appearance & Theme</h3>
-          <p class="card-desc">Choose your preferred visual theme across Stoic popups, dashboard, and moderation pages.</p>
+          <h3>Appearance</h3>
+          <p class="card-desc">Light, dark, or whatever the system is set to. One palette, two modes.</p>
           
-          <div class="segmented" id="optThemeSeg" style="max-width: 380px; margin-top: 12px;">
+          <div class="segmented measure-narrow mt-3" id="optThemeSeg">
             <button class="seg-btn" data-value="light" type="button">Light</button>
             <button class="seg-btn" data-value="dark" type="button">Dark</button>
             <button class="seg-btn" data-value="system" type="button">System Auto</button>
@@ -310,15 +290,15 @@
         </div>
 
         <div class="card settings-card">
-          <h3>Default Action When Limit Reached</h3>
-          <p class="card-desc">Select what happens by default when your daily time allowance runs out on a site.</p>
+          <h3>When a daily limit runs out</h3>
+          <p class="card-desc">What happens by default on a site whose daily limit is spent.</p>
           
-          <div class="segmented" id="optDefaultActionSeg" style="max-width: 380px; margin-top: 12px;">
+          <div class="segmented measure-narrow mt-3" id="optDefaultActionSeg">
             <button class="seg-btn active" data-value="page">Reality-Check Page</button>
             <button class="seg-btn" data-value="redirect">Custom Redirect URL</button>
           </div>
 
-          <div id="optGlobalRedirectRow" style="display:none; margin-top: 12px; max-width: 440px;">
+          <div id="optGlobalRedirectRow" class="measure mt-3" hidden>
             <label for="optGlobalRedirectInput" class="field-label">Default Redirect URL</label>
             <input class="field" id="optGlobalRedirectInput" placeholder="https://..." />
           </div>
@@ -328,22 +308,22 @@
           <h3>The Daily Standard</h3>
           <p class="card-desc">Two thresholds that decide whether a day counts as held — the basis for streaks, XP and achievements.</p>
 
-          <div style="max-width: 440px; margin-top: 16px;">
+          <div class="measure mt-4">
             <div class="field-row">
               <label for="optLeisureCeilingInput">Leisure ceiling</label>
               <input class="field" type="number" id="optLeisureCeilingInput" min="15" max="240" step="1" />
               <span class="unit">min/day</span>
             </div>
-            <p class="card-desc" style="margin: -6px 0 0;">A day is only held if leisure-category time stays at or under this many minutes.</p>
+            <p class="card-desc field-hint-tight">A day is only held if leisure-category time stays at or under this many minutes.</p>
           </div>
 
-          <div style="max-width: 440px; margin-top: 18px;">
+          <div class="measure mt-5">
             <div class="field-row">
               <label for="optFocusTargetInput">Focus target</label>
               <input class="field" type="number" id="optFocusTargetInput" min="40" max="90" step="1" />
               <span class="unit">score</span>
             </div>
-            <p class="card-desc" style="margin: -6px 0 0;">A day is only held if the focus score reaches this value — waived on a day with under 30 minutes tracked.</p>
+            <p class="card-desc field-hint-tight">A day is only held if the focus score reaches this value — waived on a day with under 30 minutes tracked.</p>
           </div>
         </div>
       </div>
@@ -357,23 +337,23 @@
 
         <div class="grid-2col">
           <div class="card settings-card">
-            <h3>Export Settings</h3>
-            <p class="card-desc">Download a backup file containing all configured sites, limits, schedules, and preferences.</p>
-            <button class="btn-primary btn-accent" id="optExportBtn" type="button" style="margin-top: 14px;">Export Backup JSON</button>
+            <h3>Export</h3>
+            <p class="card-desc">A JSON file with every rule, schedule and preference. Yours to keep.</p>
+            <button class="btn-primary btn-accent mt-4" id="optExportBtn" type="button">Export Backup JSON</button>
           </div>
 
           <div class="card settings-card">
-            <h3>Import Settings</h3>
-            <p class="card-desc">Restore your Stoic configuration from a previously exported JSON backup file.</p>
-            <button class="btn-ghost" id="optImportBtn" type="button" style="margin-top: 14px;">Import Backup File</button>
+            <h3>Import</h3>
+            <p class="card-desc">Restore rules and preferences from a file you exported earlier.</p>
+            <button class="btn-ghost mt-4" id="optImportBtn" type="button">Import Backup File</button>
             <input type="file" id="optImportFile" accept="application/json" hidden />
-            <div class="settings-note" id="optImportNote" hidden></div>
+            <div class="settings-note" id="optImportNote" role="status" aria-live="polite" hidden></div>
           </div>
         </div>
 
         <div class="card danger-card">
           <h3>Danger Zone</h3>
-          <p>Permanently remove all site disciplines and clear usage history. This action cannot be undone.</p>
+          <p>Removes every rule and the whole time history. Your record — level, streaks and achievements — is kept. This cannot be undone.</p>
           <button class="btn-danger" id="optResetAllBtn" type="button">Reset All Data & Clear History</button>
         </div>
       </div>
@@ -385,15 +365,15 @@
       <div class="dashboard-section">
         <div class="panel-header">
           <div>
-            <h2 class="section-title">YouTube Content Classification & Debugger</h2>
-            <p class="panel-desc">Inspect live metadata extraction, channel database lookup, cache state, and confidence scores.</p>
+            <h2 class="section-title">What counts as what on YouTube</h2>
+            <p class="panel-desc">Stoic tells a lecture apart from a prank video, so a productive hour on YouTube is not filed as leisure. This is where you correct it when it gets one wrong.</p>
           </div>
           <button class="btn-ghost" type="button" id="refreshDebugBtn">Refresh Inspector</button>
         </div>
 
         <!-- Live Inspector Card -->
         <div class="card settings-card">
-          <h3>Active Tab Metadata Inspector</h3>
+          <h3>What Stoic can see in the open tab</h3>
           <div class="yt-debug-grid" style="margin-top: 14px;">
             <div class="yt-debug-card">
               <div class="debug-card-lbl">Extracted Video ID</div>
@@ -503,7 +483,7 @@
 
             <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
               <button type="submit" id="saveAiSettingsBtn" class="btn-primary btn-accent" style="padding: 6px 16px;">Save AI Settings</button>
-              <span id="aiSettingsNote" class="settings-note" style="display: none; margin: 0; font-size: 12px;"></span>
+              <span id="aiSettingsNote" class="settings-note" role="status" aria-live="polite" style="display: none; margin: 0; font-size: 12px;"></span>
             </div>
           </form>
         </div>
@@ -512,11 +492,11 @@
         <div class="card settings-card">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <div>
-              <h3>Channel Database (yt_channels)</h3>
-              <p class="card-desc">Persisted YouTube channel classifications used for content-aware routing.</p>
+              <h3>Channels you have classified</h3>
+              <p class="card-desc">Channels you have told Stoic what to count as. These override everything else.</p>
             </div>
             <div style="display: flex; gap: 8px;">
-              <button class="btn-ghost" type="button" id="resetChannelDbBtn" style="color: var(--sem-red);" title="Wipe all channel classifications">Clear Channel DB</button>
+              <button class="btn-ghost" type="button" id="resetChannelDbBtn" style="color: var(--missed-soft);" title="Wipe all channel classifications">Clear Channel DB</button>
               <button class="btn-primary btn-accent" type="button" id="addChannelBtn">+ Add / Classify Channel</button>
             </div>
           </div>
@@ -541,8 +521,8 @@
 
         <!-- Video Database Log Card -->
         <div class="card settings-card">
-          <h3>Extracted Video Database (yt_videos)</h3>
-          <p class="card-desc">Recent YouTube videos visited and linked to channel IDs.</p>
+          <h3>Videos seen recently</h3>
+          <p class="card-desc">Recent videos and the channel each was attributed to.</p>
           <div class="table-wrapper" style="margin-top: 14px;">
             <table class="table" id="videosTable">
               <thead>
@@ -582,14 +562,14 @@
           category you choose, and prediction never runs for it again.
         </div>
 
-        <label class="field-label" style="margin-top: 14px;">Category</label>
+        <label class="field-label mt-4">Category</label>
         <div class="segmented" id="ytClassifyMacroSeg">
           <button class="seg-btn" type="button" data-value="Productivity">Productive</button>
           <button class="seg-btn active" type="button" data-value="General">General Browsing</button>
           <button class="seg-btn" type="button" data-value="Leisure">Leisure</button>
         </div>
 
-        <div style="margin-top: 12px;">
+        <div class="mt-3">
           <label for="ytClassifyMicro" class="field-label">Sub-category</label>
           <select class="field" id="ytClassifyMicro"></select>
         </div>
@@ -614,7 +594,7 @@
         <input class="field" id="customCategoryName" placeholder="e.g. Study" />
         <div class="field-error" id="customCategoryError"></div>
 
-        <label class="field-label" style="margin-top: 14px;">Macro category</label>
+        <label class="field-label mt-4">Macro category</label>
         <div class="segmented" id="customCategoryMacroSeg">
           <button class="seg-btn" type="button" data-value="Productivity">Productive</button>
           <button class="seg-btn active" type="button" data-value="General">General Browsing</button>
@@ -633,38 +613,38 @@
   <dialog class="modal-dialog" id="optModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="optModalTitle">Configure Moderation Rule</h3>
+        <h3 id="optModalTitle">New rule</h3>
         <button class="modal-close" id="optModalCloseBtn" type="button">&times;</button>
       </div>
       <form id="optModalForm" class="modal-body" novalidate>
-        <label for="optModalDomain" class="field-label">Domain Name</label>
+        <label for="optModalDomain" class="field-label">Site</label>
         <input class="field" id="optModalDomain" placeholder="e.g. youtube.com" />
         <div class="field-error" id="optModalDomainError"></div>
 
-        <label class="field-label" style="margin-top: 10px;">Moderation Mode</label>
+        <label class="field-label mt-3">What should happen</label>
         <div class="segmented" id="optModalModeSeg">
-          <button class="seg-btn active" type="button" data-value="limit">Time Limit</button>
-          <button class="seg-btn" type="button" data-value="restraint">Restraint Mode</button>
-          <button class="seg-btn" type="button" data-value="block">Full Block</button>
+          <button class="seg-btn active" type="button" data-value="limit">Daily limit</button>
+          <button class="seg-btn" type="button" data-value="restraint">Pause first</button>
+          <button class="seg-btn" type="button" data-value="block">Always closed</button>
         </div>
 
-        <div id="optModalLimitRow" class="field-row" style="margin-top: 10px;">
+        <div id="optModalLimitRow" class="field-row mt-3">
           <label for="optModalMinutes">Daily limit</label>
           <input class="field" type="number" id="optModalMinutes" value="30" min="1" />
           <span class="unit">min/day</span>
         </div>
 
-        <div id="optModalRestraintRow" style="display:none; margin-top: 12px; flex-direction: column; gap: 6px;">
-          <div class="callout" style="margin: 0;">
+        <div id="optModalRestraintRow" class="mt-3" hidden>
+          <div class="callout">
             <div class="callout-label">Fixed, on purpose</div>
-            <div class="callout-text">Restraint Mode always uses the same maximum-friction gate: a 60-second wait that can't be skipped, two hard puzzles solved back to back, and a genuinely written reason. This isn't configurable — a weaker option here would just be an escape hatch.</div>
+            <div class="callout-text">The pause is always the same: sixty seconds that cannot be skipped, two hard problems solved back to back, and one written sentence. Loosening this rule later costs exactly the same — settings are never the easy way round.</div>
           </div>
         </div>
 
-        <details class="disclosure" style="margin-top: 14px;">
-          <summary>Schedule & Focus Hours</summary>
+        <details class="disclosure mt-4">
+          <summary>Only on certain days or hours</summary>
           <div>
-            <div class="section-label small">Active Days</div>
+            <div class="section-label small">Days this applies</div>
             <div class="day-picker" id="optModalDayPicker">
               <button class="day-btn active" type="button" data-day="1">M</button>
               <button class="day-btn active" type="button" data-day="2">T</button>
@@ -675,7 +655,7 @@
               <button class="day-btn active" type="button" data-day="0">S</button>
             </div>
 
-            <div class="field-row time-row" style="margin-top: 12px;">
+            <div class="field-row time-row mt-3">
               <label for="optModalStartTime">Focus hours</label>
               <input class="field time-field" type="time" id="optModalStartTime" />
               <span class="unit">to</span>
@@ -717,8 +697,8 @@
           <div class="gate-step-label">2 · Solve <span id="fgPuzzleGoal">2</span> in a row</div>
           <div class="fg-puzzle-row">
             <span class="fg-puzzle-question" id="fgPuzzleQuestion"></span>
-            <input class="field" type="number" id="fgPuzzleInput" placeholder="?" style="width:90px; margin-bottom:0;" />
-            <button class="btn-ghost" type="button" id="fgPuzzleCheckBtn" style="padding: 8px 14px;">Check</button>
+            <input class="field field-narrow" type="number" id="fgPuzzleInput" placeholder="?" />
+            <button class="btn-ghost btn-compact" type="button" id="fgPuzzleCheckBtn">Check</button>
           </div>
           <div class="gate-puzzle-progress" id="fgPuzzleProgress"></div>
           <div class="field-error" id="fgPuzzleErr">Incorrect. Streak reset — new problem:</div>
@@ -726,7 +706,7 @@
 
         <div class="fg-step">
           <div class="gate-step-label">3 · Explain, honestly, why you're doing this</div>
-          <textarea class="field" id="fgReasonInput" rows="3" placeholder="Write a real, specific reason..." style="margin-bottom: 4px;"></textarea>
+          <textarea class="field" id="fgReasonInput" rows="3" placeholder="Write a real, specific reason…"></textarea>
           <div class="field-error" id="fgReasonErr"></div>
         </div>
 

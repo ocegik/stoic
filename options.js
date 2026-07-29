@@ -1,30 +1,60 @@
 // ===== options.js — Stoic Analytics & Moderation Dashboard =====
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Navigation Tabs
-  const tabs = document.querySelectorAll(".nav-tab");
+  // Navigation Tabs.
+  //
+  // The markup declares the ARIA tab pattern (role="tablist"/"tab"/"tabpanel"
+  // + aria-selected), so it has to behave like one: a screen reader tells the
+  // user to press the arrow keys, and previously nothing happened. That is
+  // worse than plain buttons. This implements the full pattern — roving
+  // tabindex, Left/Right/Home/End, and aria-controls wiring.
+  const tabs = Array.from(document.querySelectorAll(".nav-tab"));
   const panels = document.querySelectorAll(".tab-panel");
 
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      tabs.forEach((t) => {
-        t.classList.remove("active");
-        t.setAttribute("aria-selected", "false");
-      });
-      panels.forEach((p) => {
-        p.classList.remove("active");
-        p.hidden = true;
-      });
+  function selectTab(tab, { focus = false } = {}) {
+    tabs.forEach((t) => {
+      const isActive = t === tab;
+      t.classList.toggle("active", isActive);
+      t.setAttribute("aria-selected", isActive ? "true" : "false");
+      // Only the selected tab is in the page's tab order; the arrow keys
+      // move between them from there.
+      t.tabIndex = isActive ? 0 : -1;
+    });
+    panels.forEach((p) => {
+      p.classList.remove("active");
+      p.hidden = true;
+    });
 
-      tab.classList.add("active");
-      tab.setAttribute("aria-selected", "true");
+    const targetPanel = document.getElementById(tab.getAttribute("data-target"));
+    if (targetPanel) {
+      targetPanel.classList.add("active");
+      targetPanel.hidden = false;
+    }
+    if (focus) tab.focus();
+  }
 
-      const targetId = tab.getAttribute("data-target");
-      const targetPanel = document.getElementById(targetId);
-      if (targetPanel) {
-        targetPanel.classList.add("active");
-        targetPanel.hidden = false;
-      }
+  tabs.forEach((tab, index) => {
+    const targetId = tab.getAttribute("data-target");
+    const panel = document.getElementById(targetId);
+    if (panel) {
+      const tabId = `${targetId}-tab`;
+      tab.id = tabId;
+      tab.setAttribute("aria-controls", targetId);
+      panel.setAttribute("aria-labelledby", tabId);
+    }
+    tab.tabIndex = tab.classList.contains("active") ? 0 : -1;
+
+    tab.addEventListener("click", () => selectTab(tab));
+
+    tab.addEventListener("keydown", (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      let next = null;
+      if (step) next = tabs[(index + step + tabs.length) % tabs.length];
+      else if (e.key === "Home") next = tabs[0];
+      else if (e.key === "End") next = tabs[tabs.length - 1];
+      if (!next) return;
+      e.preventDefault();
+      selectTab(next, { focus: true });
     });
   });
 
@@ -50,12 +80,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optTopWebsitesList = document.getElementById("optTopWebsitesList");
   const optOverviewRulesActive = document.getElementById("optOverviewRulesActive");
   const optOverviewTrippedCount = document.getElementById("optOverviewTrippedCount");
-  const optOverviewTimeSaved = document.getElementById("optOverviewTimeSaved");
+  const optOverviewRefusals = document.getElementById("optOverviewRefusals");
 
   // Moderation Rules Summary Refs
   const optModLimitedCount = document.getElementById("optModLimitedCount");
   const optModTrippedCount = document.getElementById("optModTrippedCount");
-  const optModTimeSaved = document.getElementById("optModTimeSaved");
 
   // Panel & Grid Refs
   const optDisciplinesGrid = document.getElementById("optDisciplinesGrid");
@@ -257,28 +286,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  const MODE_STRICTNESS = { unconstrained: 0, limit: 1, restraint: 2, block: 3 };
-
-  // True when saving newEntry over oldEntry would reduce the friction the
-  // user previously set up — a weaker mode, a longer daily limit, or a
-  // narrower schedule. Used to decide whether an edit needs the gate.
-  function isLoosening(oldEntry, newEntry) {
-    if (!oldEntry || !oldEntry.mode || oldEntry.mode === "unconstrained") return false;
-    const oldRank = MODE_STRICTNESS[oldEntry.mode] ?? 0;
-    const newRank = MODE_STRICTNESS[newEntry.mode] ?? 0;
-    if (newRank < oldRank) return true;
-
-    if (newRank === oldRank && oldEntry.mode === "limit") {
-      if ((newEntry.limitMinutes || 0) > (oldEntry.limitMinutes || 0)) return true;
-    }
-
-    const oldSchedule = normalizeSchedule(oldEntry.schedule);
-    const newSchedule = normalizeSchedule(newEntry.schedule);
-    if (newSchedule.days.length < oldSchedule.days.length) return true;
-    if (oldSchedule.startTime && oldSchedule.endTime && (!newSchedule.startTime || !newSchedule.endTime)) return true;
-
-    return false;
-  }
+  // Shared with the popup — see isLooseningRule in common.js. Both surfaces
+  // must agree on what counts as loosening, or one of them becomes the cheap
+  // way round the gate.
+  const isLoosening = isLooseningRule;
 
   let modalMode = "limit";
 
@@ -300,8 +311,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireSegmented(optModalModeSeg, (val) => {
     modalMode = val;
-    optModalLimitRow.style.display = val === "limit" ? "flex" : "none";
-    if (optModalRestraintRow) optModalRestraintRow.style.display = val === "restraint" ? "flex" : "none";
+    optModalLimitRow.hidden = val !== "limit";
+    if (optModalRestraintRow) optModalRestraintRow.hidden = val !== "restraint";
   });
 
   if (siteSearchInput) {
@@ -380,6 +391,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderAll();
   }
 
+  // Lifetime refusals live in the progression store, not in `sites`, so this
+  // is the one number on Overview that has to be fetched. It is rendered
+  // out-of-band rather than making the whole synchronous render async.
+  async function renderLifetimeRefusals() {
+    if (!optOverviewRefusals) return;
+    try {
+      const prog = await loadProgression();
+      optOverviewRefusals.textContent = (prog.lifetime && prog.lifetime.refusals) || 0;
+    } catch {
+      optOverviewRefusals.textContent = "—";
+    }
+  }
+
+  // Every surface that can be empty says what would appear here and what
+  // makes it appear. A blank box is not an empty state (audit §2.5).
+  function emptyState(title, body) {
+    return `<div class="empty-state empty-state-inline">
+      <span class="empty-state-title">${title}</span>
+      <span class="empty-state-body">${body}</span>
+    </div>`;
+  }
+
   function renderAll() {
     const today = todayStr();
     const browsing = getBrowsingStats(sites, today);
@@ -394,15 +427,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const optFocusScoreSub = document.getElementById("optFocusScoreSub");
     if (optFocusGaugePath) {
       optFocusGaugePath.setAttribute("stroke-dasharray", `${focusScore}, 100`);
+      // Descriptive, never a verdict — and it avoids the word "restraint",
+      // which the glossary reserves for the pause (docs/GLOSSARY.md §2).
       if (focusScore >= 80) {
-        optFocusGaugePath.style.stroke = "var(--sem-green)";
-        if (optFocusScoreSub) optFocusScoreSub.textContent = "High Restraint";
+        optFocusGaugePath.style.stroke = "var(--held)";
+        if (optFocusScoreSub) optFocusScoreSub.textContent = "Mostly productive time";
       } else if (focusScore >= 50) {
-        optFocusGaugePath.style.stroke = "var(--sem-amber)";
-        if (optFocusScoreSub) optFocusScoreSub.textContent = "Moderate Restraint";
+        optFocusGaugePath.style.stroke = "var(--partial)";
+        if (optFocusScoreSub) optFocusScoreSub.textContent = "A mixed day so far";
       } else {
-        optFocusGaugePath.style.stroke = "var(--sem-red)";
-        if (optFocusScoreSub) optFocusScoreSub.textContent = "Attention Needed";
+        optFocusGaugePath.style.stroke = "var(--missed)";
+        if (optFocusScoreSub) optFocusScoreSub.textContent = "Mostly leisure time";
       }
     }
 
@@ -412,7 +447,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 3. Overview Behaviour Summary (Compact Row: Limits Triggered, Rules Active, Time Saved)
     if (optOverviewTrippedCount) optOverviewTrippedCount.textContent = moderation.limitsTriggeredToday;
     if (optOverviewRulesActive) optOverviewRulesActive.textContent = moderation.limitedSitesCount;
-    if (optOverviewTimeSaved) optOverviewTimeSaved.textContent = fmtMinutes(moderation.estimatedTimeSavedMinutes);
+    renderLifetimeRefusals();
 
     // 4. Detailed Analysis AI Insight
     const optInsightText = document.getElementById("optInsightText");
@@ -421,7 +456,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 5. Rules Moderation Performance Summary
     if (optModLimitedCount) optModLimitedCount.textContent = moderation.limitedSitesCount;
     if (optModTrippedCount) optModTrippedCount.textContent = moderation.limitsTriggeredToday;
-    if (optModTimeSaved) optModTimeSaved.textContent = fmtMinutes(moderation.estimatedTimeSavedMinutes);
 
     renderSyncSection();
     renderAnalytics(browsing);
@@ -476,22 +510,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     optTopWebsitesList.innerHTML = "";
 
     if (!topWebsites || topWebsites.length === 0) {
-      optTopWebsitesList.innerHTML = `<div class="empty-top-sites">No website activity recorded today.</div>`;
+      optTopWebsitesList.innerHTML = emptyState(
+        "Nothing tracked today",
+        "Sites appear here once you have spent a minute on them."
+      );
       return;
     }
 
     const top5 = topWebsites.slice(0, 5);
     top5.forEach((item) => {
       const displayName = getDomainDisplayName(item.domain);
-      const faviconUrl = `https://www.google.com/s2/favicons?domain=${item.domain}&sz=32`;
       const initial = (displayName.charAt(0) || "?").toUpperCase();
 
       const row = document.createElement("div");
       row.className = "top-site-row";
+      // A monogram, not a favicon. Fetching favicons from Google would send
+      // the user's most-visited domains to Google every time this page
+      // renders, which is exactly the thing the product promises it doesn't do.
       row.innerHTML = `
         <div class="top-site-favicon-box">
-          <img class="top-site-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-          <span class="top-site-avatar-fallback" style="display:none;">${initial}</span>
+          <span class="top-site-avatar-fallback">${initial}</span>
         </div>
         <div class="top-site-name">${displayName}</div>
         <div class="top-site-bar-container">
@@ -532,19 +570,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (optAnalyticsChart) {
       optAnalyticsChart.innerHTML = "";
 
-      Object.values(daysMap).forEach((day) => {
-        const col = document.createElement("div");
-        col.className = "chart-bar-col";
-        const heightPct = day.seconds > 0 ? Math.max(6, Math.round((day.seconds / maxSec) * 100)) : 0;
-        const displayVal = day.seconds > 0 ? fmtDuration(day.seconds) : "0m";
+      // Seven bars all at zero is not a chart, it is a misleading blank.
+      if (maxSec <= 1) {
+        optAnalyticsChart.innerHTML = emptyState(
+          "No week to show yet",
+          "After a day or two of tracking, the last seven days appear here."
+        );
+      } else {
+        Object.values(daysMap).forEach((day) => {
+          const col = document.createElement("div");
+          col.className = "chart-bar-col";
+          const heightPct = day.seconds > 0 ? Math.max(6, Math.round((day.seconds / maxSec) * 100)) : 0;
+          const displayVal = day.seconds > 0 ? fmtDuration(day.seconds) : "0m";
 
-        col.innerHTML = `
-          <div class="chart-val">${displayVal}</div>
-          <div class="chart-bar" style="height:${heightPct}%"></div>
-          <div class="chart-label">${day.label}</div>
-        `;
-        optAnalyticsChart.appendChild(col);
-      });
+          col.innerHTML = `
+            <div class="chart-val">${displayVal}</div>
+            <div class="chart-bar" style="height:${heightPct}%"></div>
+            <div class="chart-label">${day.label}</div>
+          `;
+          optAnalyticsChart.appendChild(col);
+        });
+      }
     }
 
     // Category Grid
@@ -561,14 +607,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const macroBreakdown = categoryBreakdown?.macroBreakdown || [];
 
     if (!macroBreakdown || macroBreakdown.length === 0) {
-      optCategoryGrid.innerHTML = `<div style="font-size:12px; color:var(--text-faint); padding:12px 0;">No browsing categories recorded today yet. Visit websites to build your breakdown!</div>`;
+      optCategoryGrid.innerHTML = emptyState(
+        "Nothing to break down yet",
+        "Once a few minutes are tracked, this shows how the day split between productive, general and leisure time."
+      );
       return;
     }
 
     const colorMap = {
-      Productivity: "#10b981",
-      General: "#0284c7",
-      Leisure: "#f59e0b",
+      Productivity: "var(--held)",
+      General: "var(--waived)",
+      Leisure: "var(--partial)",
     };
 
     macroBreakdown.forEach((mac) => {
@@ -626,7 +675,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     optDomainAuditTable.innerHTML = "";
 
     if (!browsing.topWebsites || browsing.topWebsites.length === 0) {
-      optDomainAuditTable.innerHTML = `<div style="font-size:12px; color:var(--text-faint); padding:16px;">No website activity recorded today yet. Visit websites to view real-time session tracking!</div>`;
+      optDomainAuditTable.innerHTML = emptyState(
+        "Nothing tracked today",
+        "Every site you spend a minute on appears here, with the option to put a rule on it."
+      );
       return;
     }
 
@@ -652,15 +704,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       const displayName = getDomainDisplayName(item.domain);
       const { macro, micro } = item.taxonomy || getDomainTaxonomy(item.domain, sites);
 
-      let statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:var(--accent-dim); color:var(--accent-soft); border:1px solid var(--accent-ring);">UNCONSTRAINED</span>`;
+      const badge = (label, bg, fg, bd) =>
+        `<span class="rule-badge" style="background:${bg}; color:${fg}; border-color:${bd};">${label}</span>`;
+
+      let statusBadge = badge("No rule", "transparent", "var(--text-faint)", "var(--border-soft)");
       if (item.paused) {
-        statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:var(--bg-raised); color:var(--text-faint); border:1px solid var(--border-soft);">PAUSED</span>`;
+        statusBadge = badge("Paused", "var(--bg-raised)", "var(--text-faint)", "var(--border-soft)");
       } else if (item.mode === "limit") {
-        statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:var(--sem-amber-dim); color:var(--sem-amber-soft); border:1px solid var(--sem-amber-border);">${item.entry.limitMinutes || 30}m LIMIT</span>`;
+        statusBadge = badge(`${item.entry.limitMinutes || 30}m a day`, "var(--partial-dim)", "var(--partial-soft)", "var(--partial-border)");
       } else if (item.mode === "block") {
-        statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:var(--sem-red-dim); color:var(--sem-red-soft); border:1px solid var(--sem-red-border);">RESTRAINT</span>`;
+        statusBadge = badge("Always closed", "var(--missed-dim)", "var(--missed-soft)", "var(--missed-border)");
       } else if (item.mode === "restraint") {
-        statusBadge = `<span style="padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; background:rgba(2, 132, 199, 0.12); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.25);">RESTRAINT</span>`;
+        statusBadge = badge("Pause first", "var(--waived-dim)", "var(--waived-soft)", "var(--waived-border)");
       }
 
       let categoryOptionsHtml = "";
@@ -772,9 +827,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const usedPct = isBlock ? 100 : (isRestraint ? 0 : Math.min(100, Math.round((usedSec / limitSec) * 100)));
         const streak = limitStreakDays(entry);
 
-        let progressColor = "var(--sem-green)";
-        if (usedPct >= 100) progressColor = "var(--sem-red)";
-        else if (usedPct >= 75) progressColor = "var(--sem-amber)";
+        let progressColor = "var(--held)";
+        if (usedPct >= 100) progressColor = "var(--missed)";
+        else if (usedPct >= 75) progressColor = "var(--partial)";
         const taxonomy = getDomainTaxonomy(domain, sites);
 
         card.innerHTML = `
@@ -838,7 +893,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (optStreaksList) {
       optStreaksList.innerHTML = "";
       if (keys.length === 0) {
-        optStreaksList.innerHTML = `<div style="font-size:12px; color:var(--text-faint); padding:10px 0;">No active site moderation rules set yet.</div>`;
+        optStreaksList.innerHTML = emptyState(
+          "No rules yet",
+          "Rules you set will appear here with how many days in a row you have kept each one."
+        );
         return;
       }
 
@@ -895,8 +953,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isMatch = btn.getAttribute("data-value") === modalMode;
       btn.classList.toggle("active", isMatch);
     });
-    optModalLimitRow.style.display = modalMode === "limit" ? "flex" : "none";
-    if (optModalRestraintRow) optModalRestraintRow.style.display = modalMode === "restraint" ? "flex" : "none";
+    optModalLimitRow.hidden = modalMode !== "limit";
+    if (optModalRestraintRow) optModalRestraintRow.hidden = modalMode !== "restraint";
 
     optModal.showModal();
   }
@@ -960,9 +1018,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // domain gets) to one that actually governs it — never on an edit that
     // keeps governing it (01-PRODUCT-DESIGN.md §3.10: no XP for
     // configuration work, but the origin achievement still needs the event).
-    const HAS_RULE_MODES = new Set(["limit", "restraint", "block"]);
-    const hadRule = HAS_RULE_MODES.has(existing.mode);
-    const hasRuleNow = HAS_RULE_MODES.has(updatedEntry.mode);
+    const hadRule = entryHasRule(existing);
+    const hasRuleNow = entryHasRule(updatedEntry);
 
     sites[rawDomain] = updatedEntry;
 
@@ -1368,8 +1425,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const SOURCE_BADGES = {
     manual: { label: "EXPLICIT", color: "#a855f7", tint: "rgba(168, 85, 247, 0.12)" },
     builtin: { label: "BUILT-IN", color: "#0d9488", tint: "rgba(13, 148, 136, 0.12)" },
-    predicted: { label: "PREDICTED", color: "#0284c7", tint: "rgba(2, 132, 199, 0.12)" },
-    unclassified: { label: "UNRESOLVED", color: "#f59e0b", tint: "rgba(245, 158, 11, 0.12)" },
+    predicted: { label: "PREDICTED", color: "var(--waived-soft)", tint: "var(--waived-dim)" },
+    unclassified: { label: "UNRESOLVED", color: "var(--partial-soft)", tint: "var(--partial-dim)" },
   };
 
   function sourceBadgeHtml(source) {
@@ -1387,10 +1444,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const TRACE_STATUS_COLORS = {
-    hit: "var(--sem-green)",
+    hit: "var(--held)",
     miss: "var(--text-faint)",
     skipped: "var(--text-faint)",
-    unclassified: "var(--sem-amber)",
+    unclassified: "var(--partial)",
     fallthrough: "var(--text-muted)",
   };
 
@@ -1475,7 +1532,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (info.channelLookup?.hit) {
               const c = info.channelLookup.channel?.classification;
               lookupEl.textContent = `HIT (${c ? `${c.macro}·${c.micro}` : "found"})`;
-              lookupEl.style.color = "var(--sem-green)";
+              lookupEl.style.color = "var(--held)";
             } else {
               lookupEl.textContent = "MISS (no stored channel)";
               lookupEl.style.color = "var(--text-muted)";
@@ -1527,7 +1584,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <td>
               <button class="btn-ghost edit-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Set this channel's category permanently">Classify</button>
               <button class="btn-ghost reclass-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Run the prediction system again for this channel">Re-predict</button>
-              <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--sem-red);" title="Forget this classification and let prediction decide again">Reset</button>
+              <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--missed);" title="Forget this classification and let prediction decide again">Reset</button>
             </td>
           `;
 
@@ -1608,7 +1665,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <td style="font-size: 11.5px; color: var(--text-muted);">${v.updatedAt ? new Date(v.updatedAt).toLocaleTimeString() : "--"}</td>
             <td>
               <button class="btn-ghost vid-override-btn" type="button" style="padding: 4px 8px; font-size: 11px;">Override</button>
-              ${v.override ? `<button class="btn-ghost vid-clear-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--sem-red);">Clear</button>` : ""}
+              ${v.override ? `<button class="btn-ghost vid-clear-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--missed);">Clear</button>` : ""}
             </td>
           `;
 

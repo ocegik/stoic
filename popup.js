@@ -1,61 +1,60 @@
-// ===== popup.js — Stoic Quick Glance Control Panel =====
+// ===== popup.js — the popup =====
+//
+// Two jobs, in this order:
+//   1. Let the user rule the site they are currently looking at, here, in one
+//      tap. This was previously a seven-step trip through a new browser tab
+//      (PRODUCT-AUDIT.md §3.2), which is why the popup had nothing to do.
+//   2. Report today honestly — including reporting nothing while it is still
+//      loading, rather than painting "0m · 100% focus" first.
 
-// DOM Refs
+const ONBOARDING_KEY = "onboardingSeenAt";
+
 const todayTotalEl = document.getElementById("todayTotal");
+const focusValEl = document.getElementById("focusVal");
+const focusLblEl = document.getElementById("focusLbl");
 const topSitesList = document.getElementById("topSitesList");
-const limitsTriggeredEl = document.getElementById("limitsTriggered");
-const limitedSitesCountEl = document.getElementById("limitedSitesCount");
-const timeSavedValEl = document.getElementById("timeSavedVal");
+const refusalsValEl = document.getElementById("refusalsVal");
+const rulesValEl = document.getElementById("rulesVal");
+const currentSiteEl = document.getElementById("currentSite");
+const statusEl = document.getElementById("popupStatus");
+const appEl = document.getElementById("app");
 
-const openDashboardBtn = document.getElementById("openDashboardBtn");
-const manageRulesBtn = document.getElementById("manageRulesBtn");
-const themeToggleBtn = document.getElementById("themeToggleBtn");
+const openRecordBtn = document.getElementById("openRecordBtn");
+const openSettingsBtn = document.getElementById("openSettingsBtn");
 
-function updateThemeToggleUI(theme) {
-  if (!themeToggleBtn) return;
-  const sunIcon = themeToggleBtn.querySelector(".sun-icon");
-  const moonIcon = themeToggleBtn.querySelector(".moon-icon");
+// The three rule modes, in the product's own words. The stored `mode` values
+// are unchanged — this is the vocabulary layer only (docs/GLOSSARY.md §2).
+const MODE_LABELS = {
+  limit: "Daily limit",
+  restraint: "Pause first",
+  block: "Always closed",
+};
 
-  const effectiveTheme = document.documentElement.getAttribute("data-theme") || theme;
-  const isDark = effectiveTheme === "dark" || (effectiveTheme === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+const MODE_EXPLAINERS = {
+  limit: "After the minutes are gone, the site stops opening until tomorrow.",
+  restraint: "Sixty seconds, two problems and one written sentence before it opens. Every time.",
+  block: "It doesn't open. Changing that later costs the same sixty seconds.",
+};
 
-  if (isDark) {
-    if (sunIcon) sunIcon.style.display = "block";
-    if (moonIcon) moonIcon.style.display = "none";
-    themeToggleBtn.title = "Switch to Light Mode";
-    themeToggleBtn.setAttribute("aria-label", "Switch to Light Mode");
-  } else {
-    if (sunIcon) sunIcon.style.display = "none";
-    if (moonIcon) moonIcon.style.display = "block";
-    themeToggleBtn.title = "Switch to Dark Mode";
-    themeToggleBtn.setAttribute("aria-label", "Switch to Dark Mode");
-  }
+let cachedSites = null;
+let activeDomain = null;
+let formOpen = false;
+let formMode = "limit";
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
 }
 
-async function initTheme() {
-  const currentTheme = await getThemePreference();
-  applyTheme(currentTheme);
-  updateThemeToggleUI(currentTheme);
+function monogram(name) {
+  return (String(name || "?").charAt(0) || "?").toUpperCase();
 }
 
-if (themeToggleBtn) {
-  themeToggleBtn.addEventListener("click", async () => {
-    const currentPref = await getThemePreference();
-    const effectiveTheme = document.documentElement.getAttribute("data-theme") || currentPref;
-    const isDarkNow = effectiveTheme === "dark" || (effectiveTheme === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-
-    const nextTheme = isDarkNow ? "light" : "dark";
-    await setThemePreference(nextTheme);
-    updateThemeToggleUI(nextTheme);
-  });
-}
-
-if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && Object.prototype.hasOwnProperty.call(changes, THEME_PREF_KEY)) {
-      updateThemeToggleUI(changes[THEME_PREF_KEY].newValue || "light");
-    }
-  });
+function setStatus(text, tone = "is-ok") {
+  if (!statusEl) return;
+  statusEl.textContent = text || "";
+  statusEl.className = "status-message " + (text ? tone : "");
 }
 
 function openOptions(hash = "") {
@@ -71,45 +70,216 @@ function openOptions(hash = "") {
   }
 }
 
-if (openDashboardBtn) {
-  openDashboardBtn.addEventListener("click", () => openOptions());
-}
+if (openRecordBtn) openRecordBtn.addEventListener("click", () => openOptions("#tab-progress"));
+if (openSettingsBtn) openSettingsBtn.addEventListener("click", () => openOptions("#tab-sync"));
 
-if (manageRulesBtn) {
-  manageRulesBtn.addEventListener("click", () => openOptions("#tab-rules"));
-}
+// ---------------------------------------------------------------- active tab
 
-function renderHero(sites, today) {
-  const browsing = getBrowsingStats(sites, today);
-  if (todayTotalEl) todayTotalEl.textContent = fmtDuration(browsing.totalSeconds);
-
-  // 1. Daily Comparison
-  const dailyCompEl = document.getElementById("dailyComp");
-  if (dailyCompEl) {
-    const comp = getDailyComparison(sites, today);
-    dailyCompEl.textContent = comp.text;
-    dailyCompEl.className = "hero-time-comp " + (comp.type || "neutral");
+// Only http(s) pages can carry a rule. chrome://, the Web Store and extension
+// pages can't be limited, and saying so is better than offering an action that
+// silently does nothing.
+async function resolveActiveDomain() {
+  if (typeof chrome === "undefined" || !chrome.tabs || !chrome.tabs.query) return null;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.url) return null;
+    const url = new URL(tab.url);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return normalizeDomain(url.hostname) || null;
+  } catch {
+    return null;
   }
+}
 
-  // 2. Circular Focus Score Gauge
-  const focusGaugeEl = document.getElementById("focusGauge");
-  if (focusGaugeEl) {
-    const score = calculateFocusScore(sites, today);
-    const theme = getFocusScoreTheme(score);
-    const circumference = 131.95;
-    const offset = (circumference * (1 - score / 100)).toFixed(1);
+// ------------------------------------------------------------- current site
 
-    focusGaugeEl.innerHTML = `
-      <div class="focus-gauge-ring">
-        <svg viewBox="0 0 52 52" class="gauge-svg">
-          <circle cx="26" cy="26" r="21" class="gauge-bg" />
-          <circle cx="26" cy="26" r="21" class="gauge-fill" style="stroke: ${theme.color}; stroke-dasharray: ${circumference}; stroke-dashoffset: ${offset};" />
-        </svg>
-        <span class="gauge-val" style="color: ${theme.color}">${score}</span>
+function describeRule(entry) {
+  if (!entryHasRule(entry)) return null;
+  if (entry.paused) return { text: "Rule paused", cls: "cs-rule" };
+  if (entry.mode === "limit") {
+    return { text: `${MODE_LABELS.limit} · ${entry.limitMinutes || 30}m`, cls: "cs-rule-limit" };
+  }
+  return { text: MODE_LABELS[entry.mode] || "Rule set", cls: `cs-rule-${entry.mode}` };
+}
+
+function renderCurrentSite() {
+  if (!currentSiteEl) return;
+
+  if (!activeDomain) {
+    currentSiteEl.innerHTML = `
+      <div class="cs-head">
+        <div class="cs-monogram">—</div>
+        <div class="cs-info">
+          <div class="cs-domain">No site to rule</div>
+          <div class="cs-meta">This page isn't one Stoic can time</div>
+        </div>
       </div>
-      <span class="gauge-lbl">FOCUS SCORE</span>
-    `;
+      <p class="cs-note">Open an ordinary web page and Stoic will offer to rule it from here.</p>`;
+    return;
   }
+
+  const entry = (cachedSites && cachedSites[activeDomain]) || {};
+  const displayName = getDomainDisplayName(activeDomain);
+  const usedSeconds = cachedSites ? usageSecondsForDate(entry, todayStr(), todayStr()) : 0;
+  const rule = describeRule(entry);
+  const hasRule = !!rule;
+
+  // Kept short enough to survive a long domain name without truncating.
+  const meta = hasRule
+    ? (entry.mode === "limit" && !entry.paused
+        ? `<span class="${rule.cls}">${fmtDuration(usedSeconds)} of ${entry.limitMinutes || 30}m</span>`
+        : `<span class="${rule.cls}">${escapeHtml(rule.text)}</span> · ${fmtDuration(usedSeconds)}`)
+    : `${fmtDuration(usedSeconds)} today · no rule`;
+
+  const actionLabel = hasRule ? "Change" : "Limit this site";
+
+  currentSiteEl.innerHTML = `
+    <div class="cs-head">
+      <div class="cs-monogram">${escapeHtml(monogram(displayName))}</div>
+      <div class="cs-info">
+        <div class="cs-domain" title="${escapeHtml(activeDomain)}">${escapeHtml(displayName)}</div>
+        <div class="cs-meta">${meta}</div>
+      </div>
+      <button class="btn-accent cs-action" id="csToggleBtn" type="button" aria-expanded="${formOpen}">${actionLabel}</button>
+    </div>
+    ${formOpen ? renderForm(entry) : ""}`;
+
+  const toggleBtn = document.getElementById("csToggleBtn");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      formOpen = !formOpen;
+      if (formOpen) formMode = entryHasRule(entry) ? entry.mode : "limit";
+      setStatus("");
+      renderCurrentSite();
+      if (formOpen) {
+        const first = currentSiteEl.querySelector("#csMinutes, .seg-btn.active");
+        if (first) first.focus();
+      }
+    });
+  }
+
+  if (formOpen) wireForm(entry);
+}
+
+function renderForm(entry) {
+  const minutes = entry.limitMinutes || 30;
+  const seg = ["limit", "restraint", "block"].map((mode) => (
+    `<button class="seg-btn${mode === formMode ? " active" : ""}" type="button" data-value="${mode}">${MODE_LABELS[mode]}</button>`
+  )).join("");
+
+  return `
+    <div class="cs-form" id="csForm">
+      <div class="segmented" id="csModeSeg">${seg}</div>
+      <div class="cs-form-row" id="csMinutesRow"${formMode === "limit" ? "" : " hidden"}>
+        <label for="csMinutes">Minutes a day</label>
+        <input class="field" type="number" id="csMinutes" min="1" max="1440" value="${minutes}" />
+        <span class="unit">min</span>
+      </div>
+      <p class="cs-form-explainer" id="csExplainer">${MODE_EXPLAINERS[formMode]}</p>
+      <div class="cs-form-actions">
+        <button class="btn-ghost" type="button" id="csCancelBtn">Cancel</button>
+        <button class="btn-accent" type="button" id="csSaveBtn">Save rule</button>
+      </div>
+    </div>`;
+}
+
+function wireForm(entry) {
+  const seg = document.getElementById("csModeSeg");
+  const minutesRow = document.getElementById("csMinutesRow");
+  const minutesInput = document.getElementById("csMinutes");
+  const explainer = document.getElementById("csExplainer");
+  const saveBtn = document.getElementById("csSaveBtn");
+  const cancelBtn = document.getElementById("csCancelBtn");
+
+  if (seg) {
+    seg.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        formMode = btn.getAttribute("data-value");
+        seg.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        if (minutesRow) minutesRow.hidden = formMode !== "limit";
+        if (explainer) explainer.textContent = MODE_EXPLAINERS[formMode];
+      });
+    });
+  }
+
+  // Enter saves. Typing a number and reaching for the mouse is friction the
+  // product should spend on opening sites, not on closing them.
+  if (minutesInput) {
+    minutesInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        saveRule(entry);
+      }
+    });
+  }
+
+  if (saveBtn) saveBtn.addEventListener("click", () => saveRule(entry));
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      formOpen = false;
+      setStatus("");
+      renderCurrentSite();
+    });
+  }
+}
+
+async function saveRule(existing) {
+  const minutesInput = document.getElementById("csMinutes");
+  const limitMinutes = Math.max(1, Number(minutesInput && minutesInput.value) || 30);
+
+  const updatedEntry = {
+    ...existing,
+    mode: formMode,
+    limitMinutes: formMode === "limit" ? limitMinutes : 0,
+    schedule: existing.schedule || { days: [0, 1, 2, 3, 4, 5, 6], startTime: "", endTime: "" },
+    createdAt: existing.createdAt || todayStr(),
+  };
+
+  // The popup deliberately has no friction gate of its own. If a change would
+  // loosen an existing rule it is refused here and sent to Settings, where the
+  // same sixty-second gate that guards the blocked page is waiting. A second,
+  // cheaper gate in a second surface would defeat the point of having one.
+  if (isLooseningRule(existing, updatedEntry)) {
+    setStatus("Loosening a rule takes the same sixty seconds as pushing through one. Open Stoic to do it.", "is-warn");
+    openOptions("#tab-rules");
+    return;
+  }
+
+  const hadRule = entryHasRule(existing);
+
+  cachedSites[activeDomain] = updatedEntry;
+  await saveSites(cachedSites);
+  if (!hadRule) {
+    await sendProgressionEvent("rule_created", { domain: activeDomain });
+  }
+
+  formOpen = false;
+  setStatus(
+    formMode === "limit"
+      ? `${getDomainDisplayName(activeDomain)} is now ${limitMinutes} minutes a day.`
+      : `${getDomainDisplayName(activeDomain)}: ${MODE_LABELS[formMode].toLowerCase()}.`,
+    "is-ok"
+  );
+  await render();
+}
+
+// ------------------------------------------------------------------- today
+
+function renderToday(sites, today) {
+  const browsing = getBrowsingStats(sites, today);
+  if (todayTotalEl) {
+    todayTotalEl.textContent = fmtDuration(browsing.totalSeconds);
+    todayTotalEl.classList.remove("is-pending");
+  }
+
+  if (focusValEl) {
+    const score = calculateFocusScore(sites, today);
+    focusValEl.textContent = `${score}`;
+    focusValEl.className = "today-val tabular " + (score >= 70 ? "is-held" : score >= 45 ? "is-partial" : "is-missed");
+    if (focusLblEl) focusLblEl.textContent = "Focus score";
+  }
+
+  return browsing;
 }
 
 function renderTopSites(browsing) {
@@ -119,67 +289,39 @@ function renderTopSites(browsing) {
   const top3 = (browsing.topWebsites || []).slice(0, 3);
 
   if (top3.length === 0) {
-    topSitesList.innerHTML = `<div class="empty-state">No browsing activity recorded today</div>`;
+    topSitesList.innerHTML = `
+      <div class="empty-state empty-state-inline">
+        <span class="empty-state-body">Nothing tracked yet today. Sites appear here once you've spent a minute on them.</span>
+      </div>`;
     return;
   }
 
-  const maxSec = Math.max(1, top3[0]?.seconds || 1);
+  const maxSec = Math.max(1, top3[0].seconds || 1);
 
   top3.forEach((item) => {
     const displayName = getDomainDisplayName(item.domain);
     const fillPct = item.seconds > 0 ? Math.max(6, Math.round((item.seconds / maxSec) * 100)) : 0;
-    const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(item.domain)}&sz=32`;
 
     const row = document.createElement("div");
     row.className = "site-row";
+    // A monogram, not a favicon: fetching favicons from Google would hand the
+    // user's most-visited domains to Google every time the popup opens.
     row.innerHTML = `
-      <div class="site-favicon-box">
-        <img class="site-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-        <span class="favicon-fallback" style="display:none;">${displayName.charAt(0).toUpperCase()}</span>
-      </div>
+      <div class="site-monogram">${escapeHtml(monogram(displayName))}</div>
       <div class="site-info">
         <div class="site-header">
-          <span class="site-name">${displayName}</span>
+          <span class="site-name">${escapeHtml(displayName)}</span>
           <span class="site-time">${fmtDuration(item.seconds)}</span>
         </div>
         <div class="progress-track">
           <div class="progress-fill" style="width:${fillPct}%;"></div>
         </div>
-      </div>
-    `;
+      </div>`;
     topSitesList.appendChild(row);
   });
 }
 
-// Master Render Loop
-async function render() {
-  // Prime the YouTube stores before any analytics run: classification is
-  // synchronous, so an unprimed snapshot would score a productive
-  // channel's watch time as plain leisure for the first paint.
-  await ensureYouTubeStoresLoaded();
-  const sites = await getSites();
-  const today = todayStr();
-
-  // 1. Browsing Stats & Hero
-  renderHero(sites, today);
-
-  const browsing = getBrowsingStats(sites, today);
-  renderTopSites(browsing);
-
-  // 2. Moderation Stats
-  const moderation = getModerationStats(sites, today);
-  if (limitedSitesCountEl) limitedSitesCountEl.textContent = moderation.limitedSitesCount;
-  if (limitsTriggeredEl) limitsTriggeredEl.textContent = moderation.limitsTriggeredToday;
-  if (timeSavedValEl) timeSavedValEl.textContent = fmtMinutes(moderation.estimatedTimeSavedMinutes);
-
-  // 3. Classification Debugger
-  renderDebugInfo();
-
-  // 4. Progression strip — level/rank/XP bar and today's three condition
-  // dots, built live from `sites` rather than lagging a day behind
-  // settlement (buildLiveDayView, progression-ui.js).
-  await renderProgression(sites);
-}
+// -------------------------------------------------------------- progression
 
 async function renderProgression(sites) {
   const progStripEl = document.getElementById("progStrip");
@@ -190,6 +332,11 @@ async function renderProgression(sites) {
   const liveDay = buildLiveDayView(sites, prog);
 
   if (progStripEl) progStripEl.innerHTML = renderPopupStrip(prog, liveDay);
+
+  // "Turned back from this site: N times" is the most on-brand sentence the
+  // product can say, and it previously appeared in exactly one small cell on
+  // one page (PRODUCT-AUDIT.md §4 item 24). It belongs here.
+  if (refusalsValEl) refusalsValEl.textContent = `${(prog.lifetime && prog.lifetime.refusals) || 0}`;
 
   if (progBannerEl) {
     progBannerEl.innerHTML = renderLevelUpBanner(prog);
@@ -203,86 +350,113 @@ async function renderProgression(sites) {
   }
 }
 
-async function renderDebugInfo() {
-  const dbgToggleBtn = document.getElementById("debugToggleBtn");
-  const debugContent = document.getElementById("debugContent");
-  const debugBadgeSource = document.getElementById("debugBadgeSource");
+// ------------------------------------------------------------------- render
 
-  if (dbgToggleBtn && debugContent && !dbgToggleBtn.dataset.wired) {
-    dbgToggleBtn.dataset.wired = "true";
-    dbgToggleBtn.addEventListener("click", () => {
-      const isHidden = debugContent.style.display === "none";
-      debugContent.style.display = isHidden ? "flex" : "none";
-    });
-  }
+async function render() {
+  await ensureYouTubeStoresLoaded();
+  cachedSites = await getSites();
+  const today = todayStr();
 
-  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) return;
+  const browsing = renderToday(cachedSites, today);
+  renderTopSites(browsing);
+  renderCurrentSite();
 
-  try {
-    const info = await chrome.runtime.sendMessage({ type: "GET_CLASSIFICATION_DEBUG_INFO" });
-    if (!info) return;
+  const moderation = getModerationStats(cachedSites, today);
+  if (rulesValEl) rulesValEl.textContent = `${moderation.limitedSitesCount}`;
 
-    const dbgVideoId = document.getElementById("dbgVideoId");
-    const dbgTitle = document.getElementById("dbgTitle");
-    const dbgChannel = document.getElementById("dbgChannel");
-    const dbgContentType = document.getElementById("dbgContentType");
-    const dbgChannelLookup = document.getElementById("dbgChannelLookup");
-    const dbgCacheStatus = document.getElementById("dbgCacheStatus");
-    const dbgSource = document.getElementById("dbgSource");
-    const dbgConfidence = document.getElementById("dbgConfidence");
-
-    if (dbgVideoId) dbgVideoId.textContent = info.metadata?.videoId || "--";
-    if (dbgTitle) dbgTitle.textContent = info.metadata?.title || "--";
-    if (dbgChannel) dbgChannel.textContent = info.metadata?.channelName || info.metadata?.channelId || "--";
-    if (dbgContentType) dbgContentType.textContent = info.metadata?.contentType || "video";
-
-    if (dbgChannelLookup) {
-      if (info.channelLookup?.hit) {
-        const cls = info.channelLookup.channel?.classification;
-        dbgChannelLookup.textContent = `HIT (${cls ? `${cls.macro}·${cls.micro}` : "Found"})`;
-        dbgChannelLookup.style.color = "var(--sem-green-soft)";
-      } else {
-        dbgChannelLookup.textContent = "MISS (Domain Fallback)";
-        dbgChannelLookup.style.color = "var(--text-muted)";
-      }
-    }
-
-    if (dbgCacheStatus) dbgCacheStatus.textContent = info.cacheStatus || "MISS";
-
-    const source = info.classification?.source || "domain_rule";
-    if (dbgSource) dbgSource.textContent = source;
-    if (debugBadgeSource) {
-      const BADGE_BY_SOURCE = {
-        manual_video: "Video",
-        manual_channel: "Explicit",
-        builtin_channel: "Built-in",
-        user_override: "Your rule",
-        predicted_channel: "Predicted",
-        predicted_video: "Predicted",
-      };
-      debugBadgeSource.textContent = BADGE_BY_SOURCE[source] || "Domain";
-    }
-
-    if (dbgConfidence) {
-      const conf = Math.round((info.classification?.confidence || 0.8) * 100);
-      dbgConfidence.textContent = `${conf}%`;
-    }
-
-    const dbgReason = document.getElementById("dbgReason");
-    if (dbgReason) {
-      dbgReason.textContent = info.classification?.metadata?.reason || info.channelLookup?.channel?.reason || "--";
-    }
-  } catch {
-    /* Ignore background connection errors */
-  }
+  await renderProgression(cachedSites);
 }
 
-// Auto-refresh on DOM load
-document.addEventListener("DOMContentLoaded", () => {
-  initTheme();
-  render();
-  // Fire-and-forget: an idle browser only settles progression when
-  // something checks in. Opening the popup is exactly that moment
+// ---------------------------------------------------------------- first run
+
+async function shouldShowOnboarding() {
+  if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return false;
+  const stored = await chrome.storage.local.get(ONBOARDING_KEY);
+  return !stored[ONBOARDING_KEY];
+}
+
+async function dismissOnboarding() {
+  const onboardingEl = document.getElementById("onboarding");
+  if (onboardingEl) onboardingEl.hidden = true;
+  if (appEl) appEl.hidden = false;
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    await chrome.storage.local.set({ [ONBOARDING_KEY]: Date.now() });
+  }
+  await render();
+}
+
+function setupOnboarding() {
+  const onboardingEl = document.getElementById("onboarding");
+  const panels = Array.from(onboardingEl.querySelectorAll(".onboard-panel"));
+  const dotsEl = document.getElementById("onboardDots");
+  const nextBtn = document.getElementById("onboardNextBtn");
+  const skipBtn = document.getElementById("onboardSkipBtn");
+  const ruleSlot = document.getElementById("onboardRuleSlot");
+  let step = 0;
+
+  dotsEl.innerHTML = panels.map(() => `<span class="onboard-dot"></span>`).join("");
+
+  function show(index) {
+    step = index;
+    panels.forEach((p, i) => { p.hidden = i !== index; });
+    Array.from(dotsEl.children).forEach((d, i) => d.classList.toggle("is-current", i === index));
+    nextBtn.textContent = index === panels.length - 1 ? "Done" : "Next";
+    skipBtn.hidden = index === panels.length - 1;
+
+    // The last panel offers a rule for the tab the user already has open —
+    // the whole first-run sequence ends in the product's primary action, not
+    // in a "Get started" button that leads to an empty dashboard.
+    if (index === panels.length - 1) {
+      ruleSlot.innerHTML = "";
+      ruleSlot.appendChild(currentSiteEl);
+      formOpen = !!activeDomain;
+      formMode = "limit";
+      renderCurrentSite();
+    }
+  }
+
+  nextBtn.addEventListener("click", async () => {
+    if (step === panels.length - 1) {
+      // Put the primary control back where it lives before handing over.
+      if (appEl && currentSiteEl.parentElement === ruleSlot) {
+        appEl.insertBefore(currentSiteEl, document.getElementById("todayRow"));
+      }
+      formOpen = false;
+      await dismissOnboarding();
+      return;
+    }
+    show(step + 1);
+  });
+
+  skipBtn.addEventListener("click", async () => {
+    if (appEl && currentSiteEl.parentElement === ruleSlot) {
+      appEl.insertBefore(currentSiteEl, document.getElementById("todayRow"));
+    }
+    formOpen = false;
+    await dismissOnboarding();
+  });
+
+  onboardingEl.hidden = false;
+  if (appEl) appEl.hidden = true;
+  show(0);
+}
+
+// --------------------------------------------------------------------- boot
+
+document.addEventListener("DOMContentLoaded", async () => {
+  applyTheme(await getThemePreference());
+  activeDomain = await resolveActiveDomain();
+
+  if (await shouldShowOnboarding()) {
+    cachedSites = await getSites();
+    setupOnboarding();
+  } else {
+    if (appEl) appEl.hidden = false;
+    await render();
+  }
+
+  // Fire-and-forget: an idle browser only settles progression when something
+  // checks in. Opening the popup is exactly that moment
   // (03-IMPLEMENTATION-SPEC.md §6.1).
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
     chrome.runtime.sendMessage({ type: "REQUEST_SETTLEMENT" }, () => {
@@ -295,9 +469,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" || area === "sync") {
+    // Don't repaint underneath a form the user is mid-way through filling in.
+    if ((area === "local" || area === "sync") && !formOpen && appEl && !appEl.hidden) {
       render();
     }
   });
 }
-

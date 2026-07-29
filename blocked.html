@@ -3,10 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Stoic — Discipline Held</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Stoic</title>
 <link rel="stylesheet" href="tokens.css" />
 <link rel="stylesheet" href="components.css" />
 <link rel="stylesheet" href="blocked.css" />
@@ -19,24 +16,11 @@
       <header class="blocked-header">
         <div class="brand-badge-row">
           <div class="mark-wrap">
-            <svg viewBox="0 0 84 84" fill="none" aria-hidden="true">
-              <rect width="84" height="84" rx="22" fill="url(#stoic-brand-grad-blocked)"/>
-              <path d="M18 24C18 22.8954 18.8954 22 20 22H64C65.1046 22 66 22.8954 66 24V27.5C66 28.0523 65.5523 28.5 65 28.5H19C18.4477 28.5 18 28.0523 18 27.5V24Z" fill="white"/>
-              <rect x="24.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
-              <rect x="38.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
-              <rect x="52.5" y="32" width="7" height="24" rx="3.5" fill="white" fill-opacity="0.95"/>
-              <path d="M18 59.5C18 58.9477 18.4477 58.5 19 58.5H65C65.5523 58.5 66 58.9477 66 59.5V63C66 64.1046 65.1046 65 64 65H20C18.8954 65 18 64.1046 18 63V59.5Z" fill="white"/>
-              <defs>
-                <linearGradient id="stoic-brand-grad-blocked" x1="0" y1="0" x2="84" y2="84" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#0284c7"/>
-                  <stop offset="1" stop-color="#0369a1"/>
-                </linearGradient>
-              </defs>
-            </svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3H18V5.4H13.8V18.6H18V21H6V18.6H10.2V5.4H6Z"/></svg>
           </div>
           <div class="brand-title-group">
             <span class="brand-name">Stoic</span>
-            <span class="eyebrow-status" id="eyebrowStatus">DISCIPLINE HELD</span>
+            <span class="eyebrow-status" id="eyebrowStatus"></span>
           </div>
         </div>
       </header>
@@ -48,7 +32,7 @@
         <section class="blocked-pane pane-info">
           <div class="pane-header-group">
             <h1 id="headline">One moment</h1>
-            <p class="subhead" id="subhead">Loading…</p>
+            <p class="subhead" id="subhead"><span class="skeleton skeleton-line" style="width: 70%;">&nbsp;</span></p>
           </div>
 
           <div class="placard callout" id="placardBox">
@@ -59,7 +43,7 @@
           <div class="equivalency-box" id="equivalency"></div>
 
           <div class="stat-section-wrapper">
-            <div class="stat-section-label">Usage Metrics</div>
+            <div class="stat-section-label">Where this stands</div>
             <div class="stat-row stat-grid" id="statRow"></div>
           </div>
         </section>
@@ -68,7 +52,7 @@
         <section class="blocked-pane pane-actions">
           <!-- Restraint Interstitial Card -->
           <div id="restraintBox" class="restraint-card" style="display: none;">
-            <div class="restraint-type-badge" id="restraintBadge">MINDFUL RESTRAINT</div>
+            <div class="restraint-type-badge" id="restraintBadge">THE PAUSE</div>
             <div id="restraintWidget" class="restraint-widget"></div>
           </div>
 
@@ -82,7 +66,7 @@
             </div>
           </div>
 
-          <div class="adjust-note">To adjust or remove this discipline, open Stoic from your toolbar.</div>
+          <div class="adjust-note">To change this rule, open Stoic from your toolbar. Loosening it costs the same sixty seconds as pushing through it.</div>
         </section>
 
       </main>

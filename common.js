@@ -440,6 +440,40 @@ async function removeRestraintPassForTab(tabId) {
   }
 }
 
+// The four rule strengths, ordered. "unconstrained" is the absence of a rule.
+const MODE_STRICTNESS = { unconstrained: 0, limit: 1, restraint: 2, block: 3 };
+
+// The set of modes that actually govern a domain. Every visited domain gets an
+// auto-created `unconstrained` entry, so "has an entry" is not "has a rule".
+const HAS_RULE_MODES = ["limit", "restraint", "block"];
+
+function entryHasRule(entry) {
+  return !!entry && HAS_RULE_MODES.indexOf(entry.mode) !== -1;
+}
+
+// True when saving newEntry over oldEntry would reduce the friction the user
+// previously set up — a weaker mode, a longer daily limit, or a narrower
+// schedule. Anything that returns true must pass the friction gate first,
+// wherever the edit was made. Settings is never allowed to be the cheap way
+// round the blocked page, and neither is the popup.
+function isLooseningRule(oldEntry, newEntry) {
+  if (!oldEntry || !oldEntry.mode || oldEntry.mode === "unconstrained") return false;
+  const oldRank = MODE_STRICTNESS[oldEntry.mode] ?? 0;
+  const newRank = MODE_STRICTNESS[newEntry.mode] ?? 0;
+  if (newRank < oldRank) return true;
+
+  if (newRank === oldRank && oldEntry.mode === "limit") {
+    if ((newEntry.limitMinutes || 0) > (oldEntry.limitMinutes || 0)) return true;
+  }
+
+  const oldSchedule = normalizeSchedule(oldEntry.schedule);
+  const newSchedule = normalizeSchedule(newEntry.schedule);
+  if (newSchedule.days.length < oldSchedule.days.length) return true;
+  if (oldSchedule.startTime && oldSchedule.endTime && (!newSchedule.startTime || !newSchedule.endTime)) return true;
+
+  return false;
+}
+
 function getActiveRule(entry, date = new Date()) {
   const scheduledToday = isScheduleDay(entry, date);
   const withinHours = isWithinTimeWindow(entry, date);
@@ -1632,16 +1666,18 @@ function getDailyComparison(sites, todayKey = todayStr()) {
 
 function getFocusScoreTheme(score) {
   const s = Math.max(0, Math.min(100, Number(score) || 0));
+  // Colours resolve through the theme, so the same score reads correctly in
+  // Limestone and Basalt. Labels describe the day; they do not grade it.
   if (s <= 20) {
-    return { label: "Very Low", color: "#ef4444", class: "score-very-low" };
+    return { label: "Mostly leisure", color: "var(--missed)", class: "score-very-low" };
   } else if (s <= 40) {
-    return { label: "Low", color: "#f97316", class: "score-low" };
+    return { label: "Mostly leisure", color: "var(--missed)", class: "score-low" };
   } else if (s <= 60) {
-    return { label: "Medium", color: "#eab308", class: "score-medium" };
+    return { label: "Mixed", color: "var(--partial)", class: "score-medium" };
   } else if (s <= 80) {
-    return { label: "Good", color: "#22c55e", class: "score-good" };
+    return { label: "Mostly productive", color: "var(--held)", class: "score-good" };
   } else {
-    return { label: "Excellent", color: "#15803d", class: "score-excellent" };
+    return { label: "Almost all productive", color: "var(--held)", class: "score-excellent" };
   }
 }
 
@@ -1852,6 +1888,10 @@ const api = {
   hasActiveRestraintPass,
   removeRestraintPassForTab,
   normalizeDomain,
+  MODE_STRICTNESS,
+  HAS_RULE_MODES,
+  entryHasRule,
+  isLooseningRule,
   getThemePreference,
   setThemePreference,
   applyTheme,

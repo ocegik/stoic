@@ -124,40 +124,46 @@ async function main() {
   const timesTripped = entry.timesTripped || 0;
 
   if (reason === "limit") {
-    eyebrowStatus.textContent = "DISCIPLINE HELD · MODERATION";
-    headline.textContent = "Time's up for today";
-    subhead.innerHTML = `You've used today's ${limitMinutes} minute limit on <span class="site">${site}</span>.`;
+    // The eyebrow states what happened. It does not deliver a verdict: the
+    // user is on this page precisely because the limit ran out, and
+    // congratulating them at that moment is a semantic inversion.
+    eyebrowStatus.textContent = "DAILY LIMIT REACHED";
+    eyebrowStatus.className = "eyebrow-status is-partial";
+    headline.textContent = "Today's limit is spent";
+    subhead.innerHTML = `You set <span class="site">${site}</span> to ${limitMinutes} minutes a day. That was all of it.`;
     statRow.innerHTML = `
       <div class="stat-cell"><div class="stat-value">${fmtMinutes(todayMinutes)}</div><div class="stat-label">Today</div></div>
       <div class="stat-cell"><div class="stat-value">${fmtMinutes(weeklyMinutes)}</div><div class="stat-label">This week</div></div>
-      <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times tested</div></div>
+      <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times stopped here</div></div>
     `;
     equivalency.textContent = equivalencyFor(weeklyMinutes);
   } else if (reason === "restraint") {
     const targetUrl = params.get("targetUrl") || `https://${site}`;
     const displayName = getDomainDisplayName(site);
 
-    eyebrowStatus.textContent = "MINDFUL PAUSE · RESTRAINT MODE";
-    headline.textContent = "You're about to throw away your focus again.";
-    subhead.innerHTML = `You installed Stoic because you knew a moment like this — reaching for <span class="site">${displayName}</span> — would come. Is this genuinely important, or just another dopamine hit? Every distraction here delays the work that actually moves your life forward.`;
+    eyebrowStatus.textContent = "PAUSE BEFORE OPENING";
+    eyebrowStatus.className = "eyebrow-status";
+    headline.textContent = "You asked to be stopped here.";
+    subhead.innerHTML = `A minute from now, <span class="site">${displayName}</span> will feel less urgent than it does right now. If it still matters then, the way through is below.`;
     const turnedBack = await turnedBackCountFor(site);
     statRow.innerHTML = `
+      <div class="stat-cell"><div class="stat-value">${turnedBack}</div><div class="stat-label">Turned back from here</div></div>
       <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times paused</div></div>
-      <div class="stat-cell"><div class="stat-value">${turnedBack}</div><div class="stat-label">Turned back</div></div>
     `;
-    equivalency.textContent = "Restraint Mode isn't here to be convenient. It's here to make you decide on purpose, not on impulse.";
+    equivalency.textContent = "The pause isn't here to be convenient. It's here so the next minute is decided on purpose rather than on impulse.";
 
     setupRestraintChallenge(site, targetUrl);
   } else {
-    eyebrowStatus.textContent = "DISCIPLINE HELD · RESTRAINT";
+    eyebrowStatus.textContent = "ALWAYS CLOSED";
+    eyebrowStatus.className = "eyebrow-status is-missed";
     headline.textContent = "This one stays closed";
-    subhead.innerHTML = `<span class="site">${site}</span> is under full restraint.`;
+    subhead.innerHTML = `You set <span class="site">${site}</span> to stay closed. There is no way through it from here.`;
     statRow.innerHTML = `
       <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times you've reached for it</div></div>
     `;
     equivalency.textContent =
       timesTripped > 5
-        ? "That's a lot of reflexive taps toward something you already decided to cut off."
+        ? "Reaching for it is a habit. Not opening it is how the habit thins out."
         : "Every time this doesn't open, the habit gets a little weaker.";
   }
 
@@ -183,7 +189,7 @@ function setupRestraintChallenge(site, destUrl) {
   continueBtn.disabled = true;
   continueBtn.textContent = "Complete the steps below";
   if (closeBtn) closeBtn.textContent = "Go back";
-  if (restraintBadge) restraintBadge.textContent = "DELIBERATE FRICTION GATE";
+  if (restraintBadge) restraintBadge.textContent = "THE PAUSE";
 
   const displayName = getDomainDisplayName(site);
   const randomQ = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
