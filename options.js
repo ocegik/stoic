@@ -413,6 +413,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     </div>`;
   }
 
+  // Wires the "Why was this counted as X?" affordance (audit R5) inside a
+  // freshly-rendered container: a toggle button that reveals a plain-
+  // language sentence, plus an inline "Classify this channel" action. Used
+  // by both the domain audit table and the category breakdown — the two
+  // places the old debugger's job now lives.
+  function wireWhyControls(container) {
+    if (!container) return;
+    container.querySelectorAll(".why-toggle-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const panel = container.querySelector(`[data-why-panel="${btn.dataset.whyFor}"]`);
+        if (panel) panel.hidden = !panel.hidden;
+      });
+    });
+    container.querySelectorAll(".why-classify-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const channelId = btn.dataset.channelId || null;
+        const channelName = btn.dataset.channelName || null;
+        openClassifyModal({
+          kind: "channel",
+          channelId,
+          channelName,
+          label: channelName || channelId || "",
+          macro: btn.dataset.macro || "General",
+          micro: btn.dataset.micro || undefined,
+        });
+      });
+    });
+  }
+
   function renderAll() {
     const today = todayStr();
     const browsing = getBrowsingStats(sites, today);
@@ -460,12 +489,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderSyncSection();
     renderAnalytics(browsing);
     renderDisciplines(moderation);
-    // The debugger tab reads the same `sites` snapshot as everything above,
-    // so it re-renders here rather than through the wrapper-reassignment
-    // trick this file used to use.
-    renderYouTubeDebugTab().catch((err) =>
-      console.error("[Stoic] YouTube debugger render failed", err)
-    );
+    renderChannelsTable();
     renderProgress().catch((err) => console.error("[Stoic] progress tab render failed", err));
   }
 
@@ -620,17 +644,32 @@ document.addEventListener("DOMContentLoaded", async () => {
       Leisure: "var(--partial)",
     };
 
+    const today = todayStr();
+
     macroBreakdown.forEach((mac) => {
       const card = document.createElement("div");
       card.className = "category-card";
 
       const barColor = colorMap[mac.macro] || "var(--accent)";
-      const microItemsHtml = mac.micros.map((m) => `
+      const microItemsHtml = mac.micros.map((m) => {
+        // "Why?" only appears where YouTube actually contributed to this
+        // bucket today — showing it everywhere would mean guessing at an
+        // explanation for buckets nothing on YouTube touched (audit R5).
+        const why = explainCategoryToday(mac.macro, m.micro, sites, today);
+        const whyKey = `${mac.macro}|${m.micro}`;
+        return `
         <div class="micro-item-row">
           <span class="micro-item-name">${m.micro}</span>
           <span class="micro-item-time">${fmtDuration(m.seconds)} (${m.pctOfMacro}% of ${mac.macro.toLowerCase()})</span>
+          ${why ? `<button class="btn-ghost btn-compact why-toggle-btn" type="button" data-why-for="${whyKey}">Why?</button>` : ""}
         </div>
-      `).join("");
+        ${why ? `
+          <div class="why-panel" data-why-panel="${whyKey}" hidden>
+            <p class="why-sentence">${why.sentence}</p>
+            <button class="btn-ghost btn-compact why-classify-btn" type="button" data-channel-id="${why.channelId || ""}" data-channel-name="${why.channelName || ""}" data-macro="${mac.macro}" data-micro="${m.micro}">Classify this channel</button>
+          </div>
+        ` : ""}`;
+      }).join("");
 
       card.innerHTML = `
         <div class="cat-card-header">
@@ -651,6 +690,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
       optCategoryGrid.appendChild(card);
     });
+
+    wireWhyControls(optCategoryGrid);
   }
 
   async function applyDomainCategory(domain, micro, macro) {
@@ -699,6 +740,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Derived from the taxonomy in common.js rather than duplicated here,
     // so adding a category in one place is enough.
     const taxonomyGroups = selectableMicrosByMacro();
+    const today = todayStr();
 
     browsing.topWebsites.forEach((item) => {
       const displayName = getDomainDisplayName(item.domain);
@@ -742,6 +784,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       `;
 
+      // The debugger's replacement (audit R5): a one-sentence "why" for
+      // YouTube rows only — every other domain's category is exactly what
+      // it says on the tin, with nothing to explain.
+      const isYouTubeRow = isYouTubeDomain(item.domain);
+      const why = isYouTubeRow ? explainDomainToday(item.domain, sites, today) : null;
+
       html += `
         <tr>
           <td style="font-weight:700;" title="${item.domain}">${displayName}</td>
@@ -752,11 +800,22 @@ document.addEventListener("DOMContentLoaded", async () => {
           </td>
           <td>${statusBadge}</td>
           <td style="text-align:right;">
+            ${why ? `<button class="btn-ghost btn-compact why-toggle-btn" type="button" data-why-for="${item.domain}">Why?</button>` : ""}
             <button class="btn-ghost audit-action-btn" data-domain="${item.domain}" style="padding:5px 10px; font-size:11px; font-weight:600;">
               ${item.mode === "unconstrained" ? "+ Limit" : "Edit Rule"}
             </button>
           </td>
         </tr>
+        ${why ? `
+          <tr class="why-panel-row" data-why-panel="${item.domain}" hidden>
+            <td colspan="5">
+              <div class="why-panel">
+                <p class="why-sentence">${why.sentence}</p>
+                <button class="btn-ghost btn-compact why-classify-btn" type="button" data-channel-id="${why.channelId || ""}" data-channel-name="${why.channelName || ""}" data-macro="${why.macro}" data-micro="${why.micro}">Classify this channel</button>
+              </div>
+            </td>
+          </tr>
+        ` : ""}
       `;
     });
 
@@ -776,6 +835,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await applyDomainCategory(domain, selectedMicro, MICRO_TO_MACRO[selectedMicro] || "General");
       });
     });
+
+    wireWhyControls(optDomainAuditTable);
 
     optDomainAuditTable.querySelectorAll(".audit-action-btn").forEach((btn) => {
       btn.addEventListener("click", () => openModal(btn.dataset.domain));
@@ -1164,76 +1225,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // ===== YouTube & Classification Debugger Inspector & AI Settings =====
-  const refreshDebugBtn = document.getElementById("refreshDebugBtn");
+  // ===== What counts as what on YouTube (Rules tab) =====
+  // What's left of the old debugger tab: the channel classification table
+  // only. The live inspector, precedence trace and AI settings card are
+  // gone (audit R4/R5) — see docs/audit/PRODUCT-AUDIT.md Part 5.5.
   const addChannelBtn = document.getElementById("addChannelBtn");
   const resetChannelDbBtn = document.getElementById("resetChannelDbBtn");
-
-  const aiSettingsForm = document.getElementById("aiSettingsForm");
-  const aiProviderSelect = document.getElementById("aiProviderSelect");
-  const customApiFieldsGroup = document.getElementById("customApiFieldsGroup");
-  const aiApiKey = document.getElementById("aiApiKey");
-  const aiApiEndpoint = document.getElementById("aiApiEndpoint");
-  const aiConfidenceThreshold = document.getElementById("aiConfidenceThreshold");
-  const aiConfidenceVal = document.getElementById("aiConfidenceVal");
-  const aiAutoClassifyToggle = document.getElementById("aiAutoClassifyToggle");
-  const aiSettingsNote = document.getElementById("aiSettingsNote");
-
-  async function loadAndRenderAISettings() {
-    if (!aiSettingsForm) return;
-    const settings = await getAISettings();
-    if (aiProviderSelect) aiProviderSelect.value = settings.provider || "heuristic";
-    if (aiApiKey) aiApiKey.value = settings.apiKey || "";
-    if (aiApiEndpoint) aiApiEndpoint.value = settings.apiEndpoint || "";
-    if (aiConfidenceThreshold) {
-      aiConfidenceThreshold.value = settings.confidenceThreshold !== undefined ? settings.confidenceThreshold : 0.70;
-      if (aiConfidenceVal) aiConfidenceVal.textContent = `${Math.round(aiConfidenceThreshold.value * 100)}%`;
-    }
-    if (aiAutoClassifyToggle) aiAutoClassifyToggle.checked = settings.autoClassify !== false;
-
-    if (customApiFieldsGroup) {
-      customApiFieldsGroup.style.display = aiProviderSelect.value === "custom_api" ? "grid" : "none";
-    }
-  }
-
-  if (aiProviderSelect) {
-    aiProviderSelect.addEventListener("change", () => {
-      if (customApiFieldsGroup) {
-        customApiFieldsGroup.style.display = aiProviderSelect.value === "custom_api" ? "grid" : "none";
-      }
-    });
-  }
-
-  if (aiConfidenceThreshold) {
-    aiConfidenceThreshold.addEventListener("input", () => {
-      if (aiConfidenceVal) {
-        aiConfidenceVal.textContent = `${Math.round(aiConfidenceThreshold.value * 100)}%`;
-      }
-    });
-  }
-
-  if (aiSettingsForm) {
-    aiSettingsForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const updated = {
-        provider: aiProviderSelect ? aiProviderSelect.value : "heuristic",
-        apiKey: aiApiKey ? aiApiKey.value.trim() : "",
-        apiEndpoint: aiApiEndpoint ? aiApiEndpoint.value.trim() : "",
-        confidenceThreshold: aiConfidenceThreshold ? parseFloat(aiConfidenceThreshold.value) : 0.70,
-        autoClassify: aiAutoClassifyToggle ? aiAutoClassifyToggle.checked : true,
-      };
-      await saveAISettings(updated);
-
-      if (aiSettingsNote) {
-        aiSettingsNote.textContent = "AI Settings saved successfully!";
-        aiSettingsNote.className = "settings-note success";
-        aiSettingsNote.style.display = "inline";
-        setTimeout(() => {
-          aiSettingsNote.style.display = "none";
-        }, 3000);
-      }
-    });
-  }
 
   // ---- Channel / video classification modal ----
   // Replaces the old chain of window.prompt() calls, which accepted any
@@ -1405,10 +1402,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  if (refreshDebugBtn) {
-    refreshDebugBtn.addEventListener("click", () => renderYouTubeDebugTab());
-  }
-
   if (resetChannelDbBtn) {
     resetChannelDbBtn.addEventListener("click", async () => {
       if (confirm("Clear every YouTube channel classification, including the ones you set by hand?")) {
@@ -1434,263 +1427,86 @@ document.addEventListener("DOMContentLoaded", async () => {
     return `<span class="micro-badge" style="background:${badge.tint}; color:${badge.color}; border-color:${badge.tint};">${badge.label}</span>`;
   }
 
-  const TRACE_STEP_LABELS = {
-    video_override: "1 · Explicit video override",
-    explicit_channel: "2 · Explicit channel classification",
-    site_override: "3 · Category set on youtube.com",
-    predicted_channel: "4 · Predicted channel classification",
-    predicted_video: "5 · Prediction from this video's title",
-    domain_rule: "6 · Generic youtube.com rule",
-  };
-
-  const TRACE_STATUS_COLORS = {
-    hit: "var(--held)",
-    miss: "var(--text-faint)",
-    skipped: "var(--text-faint)",
-    unclassified: "var(--partial)",
-    fallthrough: "var(--text-muted)",
-  };
-
-  function renderTrace(trace) {
-    const el = document.getElementById("optDbgTrace");
-    if (!el) return;
-    if (!trace || trace.length === 0) {
-      el.innerHTML = `<li class="debug-trace-empty">Open a YouTube tab and refresh the inspector to see how its category was decided.</li>`;
-      return;
-    }
-    el.innerHTML = trace
-      .map((step) => {
-        const color = TRACE_STATUS_COLORS[step.status] || "var(--text-muted)";
-        return `
-          <li class="debug-trace-row">
-            <span class="debug-trace-step">${TRACE_STEP_LABELS[step.step] || step.step}</span>
-            <span class="debug-trace-status" style="color:${color};">${step.status.toUpperCase()}</span>
-            <span class="debug-trace-detail">${step.detail ? step.detail : ""}</span>
-          </li>`;
-      })
-      .join("");
-  }
-
-  function renderYtCategoryTotals() {
-    const el = document.getElementById("optYtCategoryTotals");
-    if (!el) return;
-    const totals = youtubeCategoryTotals(sites, todayStr());
-
-    if (!totals.totalSeconds) {
-      el.innerHTML = `<div class="yt-totals-empty">No YouTube time tracked today yet.</div>`;
-      return;
-    }
-
-    el.innerHTML = totals.segments
-      .map(
-        (seg) => `
-        <div class="yt-total-row">
-          <span class="macro-badge macro-${seg.macro.toLowerCase()}">${MACRO_CATEGORIES[seg.macro]?.label || seg.macro}</span>
-          <span class="yt-total-micro">${seg.micro}</span>
-          <div class="yt-total-bar"><div class="yt-total-fill" style="width:${Math.max(3, seg.pctOfTotal)}%;"></div></div>
-          <span class="yt-total-time">${fmtDuration(seg.seconds)}</span>
-          <span class="yt-total-pct">${seg.pctOfTotal}%</span>
-        </div>`
-      )
-      .join("");
-  }
-
-  async function renderYouTubeDebugTab() {
-    await loadAndRenderAISettings();
-    await ensureYouTubeStoresLoaded();
-
-    // 1. Live inspector for the tab currently in front of the user.
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      try {
-        const info = await chrome.runtime.sendMessage({ type: "GET_CLASSIFICATION_DEBUG_INFO" });
-        if (info) {
-          const setText = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = value;
-          };
-
-          setText("optDbgVideoId", info.metadata?.videoId || "--");
-          setText("optDbgTitle", info.metadata?.title || "--");
-          setText("optDbgChannel", info.metadata?.channelName || info.metadata?.channelId || "--");
-          setText("optDbgContentType", info.metadata?.contentType || "--");
-          setText("optDbgCacheStatus", info.cacheStatus || "MISS");
-          setText("optDbgSource", info.classification?.source || "domain_rule");
-          setText("optDbgAttribution", info.attributionKey || "--");
-          setText(
-            "optDbgConfidence",
-            `${Math.round((info.classification?.confidence ?? 0.8) * 100)}%`
-          );
-
-          const cls = info.classification;
-          setText(
-            "optDbgCategory",
-            cls ? `${MACRO_CATEGORIES[cls.macro]?.label || cls.macro} · ${cls.micro}` : "--"
-          );
-
-          const lookupEl = document.getElementById("optDbgChannelLookup");
-          if (lookupEl) {
-            if (info.channelLookup?.hit) {
-              const c = info.channelLookup.channel?.classification;
-              lookupEl.textContent = `HIT (${c ? `${c.macro}·${c.micro}` : "found"})`;
-              lookupEl.style.color = "var(--held)";
-            } else {
-              lookupEl.textContent = "MISS (no stored channel)";
-              lookupEl.style.color = "var(--text-muted)";
-            }
-          }
-
-          renderTrace(info.trace);
-        }
-      } catch {
-        /* the service worker may be asleep; the tables below still render */
-      }
-    }
-
-    // 2. Today's YouTube time by category — proof the classifications are
-    //    actually reaching analytics.
-    renderYtCategoryTotals();
-
-    // 3. Channel database.
+  // Channel database — the one piece of the old debugger tab that survives
+  // (audit R4: "they are rules about what counts as what"), moved under
+  // Rules and stripped of the internal-vocabulary framing.
+  function renderChannelsTable() {
     const channelsTableBody = document.getElementById("channelsTableBody");
-    if (channelsTableBody) {
-      channelsTableBody.innerHTML = "";
-      const channels = listChannels();
+    if (!channelsTableBody) return;
+    channelsTableBody.innerHTML = "";
+    const channels = listChannels();
 
-      if (channels.length === 0) {
-        channelsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No channel classifications stored yet. Watch a YouTube video, or use “+ Add / Classify Channel”.</td></tr>`;
-      } else {
-        channels.forEach((channel) => {
-          const cls = channel.classification || { macro: "General", micro: "Unclassified" };
-          const row = document.createElement("tr");
-          const confPct = Math.round((channel.confidence ?? 0.9) * 100);
-          const dateStr = channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : "--";
-          const macroLabel = MACRO_CATEGORIES[cls.macro]?.label || cls.macro;
-
-          row.innerHTML = `
-            <td>
-              <div style="font-weight: 700;">${channel.channelName || channel.channelId}</div>
-              <div style="font-size: 11px; color: var(--text-faint); font-family: var(--mono);">${channel.channelId}</div>
-            </td>
-            <td>
-              <span class="macro-badge macro-${cls.macro.toLowerCase()}">${macroLabel}</span>
-              <span class="micro-badge">${cls.micro}</span>
-            </td>
-            <td>
-              <div>${sourceBadgeHtml(channel.source)}${channel.pinned ? ` <span class="micro-badge" title="Explicit classifications are final — prediction never overwrites them.">PINNED</span>` : ""}</div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 240px; word-break: break-word;">${channel.reason || "--"}</div>
-            </td>
-            <td><span style="font-family: var(--mono); font-weight: 700;">${confPct}%</span></td>
-            <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
-            <td>
-              <button class="btn-ghost edit-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Set this channel's category permanently">Classify</button>
-              <button class="btn-ghost reclass-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Run the prediction system again for this channel">Re-predict</button>
-              <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--missed);" title="Forget this classification and let prediction decide again">Reset</button>
-            </td>
-          `;
-
-          row.querySelector(".edit-ch-btn").addEventListener("click", () =>
-            openClassifyModal({
-              kind: "channel",
-              channelId: channel.channelId,
-              channelName: channel.channelName,
-              label: channel.channelName || channel.channelId,
-              macro: cls.macro,
-              micro: cls.micro,
-            })
-          );
-
-          const reclassBtn = row.querySelector(".reclass-ch-btn");
-          reclassBtn.addEventListener("click", async () => {
-            reclassBtn.disabled = true;
-            reclassBtn.textContent = "Predicting...";
-            try {
-              await predictChannelClassification(
-                { channelId: channel.channelId, channelName: channel.channelName },
-                { forceReclassify: true }
-              );
-              await loadData();
-            } catch (err) {
-              alert("Re-prediction failed: " + err.message);
-              reclassBtn.disabled = false;
-              reclassBtn.textContent = "Re-predict";
-            }
-          });
-
-          row.querySelector(".del-ch-btn").addEventListener("click", async () => {
-            if (confirm(`Forget the classification for ${channel.channelName || channel.channelId}?`)) {
-              await unpinChannel({ channelId: channel.channelId, channelName: channel.channelName });
-              await loadData();
-            }
-          });
-
-          channelsTableBody.appendChild(row);
-        });
-      }
+    if (channels.length === 0) {
+      channelsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No channel classifications stored yet. Watch a YouTube video, or use “+ Add / Classify Channel”.</td></tr>`;
+      return;
     }
 
-    // 4. Video log, showing the category each video actually resolves to.
-    const videosTableBody = document.getElementById("videosTableBody");
-    if (videosTableBody) {
-      videosTableBody.innerHTML = "";
-      const videos = await getVideoDatabase();
-      const videoList = Object.values(videos)
-        .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-        .slice(0, 15);
+    channels.forEach((channel) => {
+      const cls = channel.classification || { macro: "General", micro: "Unclassified" };
+      const row = document.createElement("tr");
+      const confPct = Math.round((channel.confidence ?? 0.9) * 100);
+      const dateStr = channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : "--";
+      const macroLabel = MACRO_CATEGORIES[cls.macro]?.label || cls.macro;
 
-      if (videoList.length === 0) {
-        videosTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No video metadata extracted yet. Visit YouTube to populate this log.</td></tr>`;
-      } else {
-        videoList.forEach((v) => {
-          const { result } = explainYouTubeClassification(
-            {
-              domain: "youtube.com",
-              videoId: v.videoId,
-              channelId: v.channelId,
-              channelName: v.channelName,
-              title: v.title,
-            },
-            { sites }
+      row.innerHTML = `
+        <td>
+          <div style="font-weight: 700;">${channel.channelName || channel.channelId}</div>
+          <div style="font-size: 11px; color: var(--text-faint); font-family: var(--mono);">${channel.channelId}</div>
+        </td>
+        <td>
+          <span class="macro-badge macro-${cls.macro.toLowerCase()}">${macroLabel}</span>
+          <span class="micro-badge">${cls.micro}</span>
+        </td>
+        <td>
+          <div>${sourceBadgeHtml(channel.source)}${channel.pinned ? ` <span class="micro-badge" title="Explicit classifications are final — prediction never overwrites them.">PINNED</span>` : ""}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 240px; word-break: break-word;">${channel.reason || "--"}</div>
+        </td>
+        <td><span style="font-family: var(--mono); font-weight: 700;">${confPct}%</span></td>
+        <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
+        <td>
+          <button class="btn-ghost edit-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Set this channel's category permanently">Classify</button>
+          <button class="btn-ghost reclass-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Run the prediction system again for this channel">Re-predict</button>
+          <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--missed);" title="Forget this classification and let prediction decide again">Reset</button>
+        </td>
+      `;
+
+      row.querySelector(".edit-ch-btn").addEventListener("click", () =>
+        openClassifyModal({
+          kind: "channel",
+          channelId: channel.channelId,
+          channelName: channel.channelName,
+          label: channel.channelName || channel.channelId,
+          macro: cls.macro,
+          micro: cls.micro,
+        })
+      );
+
+      const reclassBtn = row.querySelector(".reclass-ch-btn");
+      reclassBtn.addEventListener("click", async () => {
+        reclassBtn.disabled = true;
+        reclassBtn.textContent = "Predicting...";
+        try {
+          await predictChannelClassification(
+            { channelId: channel.channelId, channelName: channel.channelName },
+            { forceReclassify: true }
           );
-          const macroLabel = MACRO_CATEGORIES[result.macro]?.label || result.macro;
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td style="font-family: var(--mono); font-weight: 700; font-size: 11.5px;">${v.videoId}</td>
-            <td style="font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${v.title || ""}">${v.title || "--"}</td>
-            <td>${v.channelName || v.channelId || "--"}</td>
-            <td>
-              <span class="macro-badge macro-${result.macro.toLowerCase()}">${macroLabel}</span>
-              <span class="micro-badge">${result.micro}</span>
-              <div style="font-size: 10.5px; color: var(--text-faint); margin-top: 2px;">${result.source}</div>
-            </td>
-            <td style="font-size: 11.5px; color: var(--text-muted);">${v.updatedAt ? new Date(v.updatedAt).toLocaleTimeString() : "--"}</td>
-            <td>
-              <button class="btn-ghost vid-override-btn" type="button" style="padding: 4px 8px; font-size: 11px;">Override</button>
-              ${v.override ? `<button class="btn-ghost vid-clear-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--missed);">Clear</button>` : ""}
-            </td>
-          `;
+          await loadData();
+        } catch (err) {
+          alert("Re-prediction failed: " + err.message);
+          reclassBtn.disabled = false;
+          reclassBtn.textContent = "Re-predict";
+        }
+      });
 
-          row.querySelector(".vid-override-btn").addEventListener("click", () =>
-            openClassifyModal({
-              kind: "video",
-              videoId: v.videoId,
-              label: v.title || v.videoId,
-              macro: result.macro,
-              micro: result.micro,
-            })
-          );
+      row.querySelector(".del-ch-btn").addEventListener("click", async () => {
+        if (confirm(`Forget the classification for ${channel.channelName || channel.channelId}?`)) {
+          await unpinChannel({ channelId: channel.channelId, channelName: channel.channelName });
+          await loadData();
+        }
+      });
 
-          const clearBtn = row.querySelector(".vid-clear-btn");
-          if (clearBtn) {
-            clearBtn.addEventListener("click", async () => {
-              await setVideoOverride(v.videoId, null);
-              await loadData();
-            });
-          }
-
-          videosTableBody.appendChild(row);
-        });
-      }
-    }
+      channelsTableBody.appendChild(row);
+    });
   }
 
   loadData();

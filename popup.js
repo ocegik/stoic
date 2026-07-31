@@ -70,8 +70,8 @@ function openOptions(hash = "") {
   }
 }
 
-if (openRecordBtn) openRecordBtn.addEventListener("click", () => openOptions("#tab-progress"));
-if (openSettingsBtn) openSettingsBtn.addEventListener("click", () => openOptions("#tab-sync"));
+if (openRecordBtn) openRecordBtn.addEventListener("click", () => openOptions("#tab-record"));
+if (openSettingsBtn) openSettingsBtn.addEventListener("click", () => openOptions("#tab-settings"));
 
 // ---------------------------------------------------------------- active tab
 

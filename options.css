@@ -785,6 +785,11 @@ body {
 }
 .btn-danger:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--missed-dim); }
 
+/* A .btn-ghost whose text reads as a destructive action, without the
+   heavier .btn-danger border treatment — for a secondary "clear" button
+   sitting next to a primary action. */
+.btn-ghost-danger { color: var(--missed-soft); }
+
 /* ---- ANALYTICS CHART ---- */
 .analytics-chart {
   display: flex;
@@ -878,150 +883,7 @@ body {
 .field-row.spread { justify-content: space-between; gap: 16px; }
 .field-row.spread .field-label { margin: 0; }
 
-/* Boxed group of sub-fields that appears conditionally beneath a parent
-   control (e.g. custom API fields under a provider dropdown). */
-.subfields-panel {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-}
-
 .time-row .time-field { flex: 1; min-width: 0; }
-
-/* ---- YOUTUBE DEBUGGER GRID ---- */
-.yt-debug-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
-}
-
-.yt-debug-card {
-  padding: 14px 16px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.debug-card-lbl {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-faint);
-}
-
-.debug-card-val {
-  font-family: var(--mono);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-  word-break: break-all;
-}
-
-
-/* ---- YouTube debugger: precedence trace & category attribution ---- */
-.debug-trace-block {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-soft);
-}
-
-.debug-trace {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.debug-trace-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) 100px minmax(0, 2fr);
-  gap: 10px;
-  align-items: baseline;
-  padding: 7px 8px;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-}
-
-.debug-trace-row:nth-child(odd) {
-  background: var(--bg-panel);
-}
-
-.debug-trace-step {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.debug-trace-status {
-  font-family: var(--mono);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.debug-trace-detail,
-.debug-trace-empty {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  word-break: break-word;
-}
-
-.debug-trace-empty {
-  padding: 8px 0;
-}
-
-.yt-category-totals {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.yt-total-row {
-  display: grid;
-  grid-template-columns: auto minmax(90px, 1fr) minmax(80px, 2fr) auto auto;
-  gap: 12px;
-  align-items: center;
-  font-size: var(--text-sm);
-}
-
-.yt-total-micro {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.yt-total-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--bg-raised);
-  overflow: hidden;
-}
-
-.yt-total-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--accent);
-}
-
-.yt-total-time {
-  font-family: var(--mono);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.yt-total-pct,
-.yt-totals-empty {
-  color: var(--text-faint);
-  font-size: var(--text-xs);
-}
 
 .field-hint {
   margin-top: 6px;
@@ -1030,12 +892,30 @@ body {
   line-height: 1.5;
 }
 
-@media (max-width: 720px) {
-  .debug-trace-row,
-  .yt-total-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
+/* "Why was this counted as X?" (audit R5) — a toggleable plain-language
+   explanation with an inline correction action. Replaces the old debugger's
+   internal-vocabulary table. */
+.why-toggle-btn { padding: 3px 9px; font-size: var(--text-xs); }
+
+.why-panel {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.why-panel-row td { padding-top: 0; }
+.why-panel-row .why-panel { margin-top: 0; }
+
+.why-sentence {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  line-height: 1.5;
 }
 
 /* ---- layout helpers ----

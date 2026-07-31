@@ -21,7 +21,6 @@ const {
   getChannel,
   clearChannelStore,
   clearVideoDatabase,
-  saveAISettings,
   youtubeCategoryTotals,
   CHANNEL_SOURCES,
 } = require("../youtube-classifier.js");
@@ -55,7 +54,6 @@ function tickCredit(entry, metadata, seconds) {
 test("end to end: prediction classifies a channel and its watch time is scored as productive", async () => {
   await clearChannelStore();
   await clearVideoDatabase();
-  await saveAISettings({ autoClassify: true, confidenceThreshold: 0.7 });
 
   const meta = metadataFor("vid_rust", "UC_RUSTY", "Rust Academy", "Rust Ownership and Borrowing Explained");
 

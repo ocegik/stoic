@@ -92,7 +92,12 @@
 
   const YT_CHANNELS_KEY = "yt_channels";
   const YT_VIDEOS_KEY = "yt_videos";
-  const AI_SETTINGS_KEY = "ai_settings";
+
+  // Flip this on locally to see the precedence-chain trace for every live
+  // classification. The options-page debugger that used to show this
+  // in the UI is gone (audit R4/R5, Part 5.5) — this is what's left for
+  // whoever is debugging a wrong category next, not for end users.
+  const YT_DEBUG_TRACE = false;
 
   const CHANNEL_STORE_VERSION = 2;
 
@@ -573,36 +578,13 @@
   // 5. Prediction settings & providers
   // ==========================================================
 
+  // Auto-classification is always on and always the local heuristic — the
+  // audit's verdict on the old provider picker / confidence slider / toggle
+  // was "remove" (Part 4 items 19-21): a switch the user can flip to make
+  // classification worse isn't a feature, and the confidence bar below which
+  // a channel is left Unclassified is an internal tuning knob, not a
+  // decision a user can meaningfully make. One sensible constant instead.
   const DEFAULT_AI_CONFIDENCE_THRESHOLD = 0.7;
-  const DEFAULT_AI_SETTINGS = {
-    provider: "heuristic", // "heuristic" | "custom_api"
-    apiKey: "",
-    apiEndpoint: "",
-    confidenceThreshold: DEFAULT_AI_CONFIDENCE_THRESHOLD,
-    autoClassify: true,
-  };
-
-  let inMemoryAISettings = null;
-
-  async function getAISettings() {
-    if (hasChromeStorage()) {
-      const { [AI_SETTINGS_KEY]: settings } = await chrome.storage.local.get(AI_SETTINGS_KEY);
-      inMemoryAISettings = { ...DEFAULT_AI_SETTINGS, ...(settings || {}) };
-      return inMemoryAISettings;
-    }
-    return inMemoryAISettings
-      ? { ...DEFAULT_AI_SETTINGS, ...inMemoryAISettings }
-      : { ...DEFAULT_AI_SETTINGS };
-  }
-
-  async function saveAISettings(settings) {
-    const updated = { ...DEFAULT_AI_SETTINGS, ...settings };
-    inMemoryAISettings = updated;
-    if (hasChromeStorage()) {
-      await chrome.storage.local.set({ [AI_SETTINGS_KEY]: updated });
-    }
-    return updated;
-  }
 
   // The keyword ladder behind the local heuristic provider, expressed as
   // data so a new topic is one row rather than another `else if`. Order is
@@ -721,52 +703,6 @@
     }
   }
 
-  class CustomAPIClassifierProvider extends BaseChannelPredictionProvider {
-    constructor({ name = "custom_api", apiKey = "", endpoint = "" } = {}) {
-      super(name);
-      this.apiKey = apiKey;
-      this.endpoint = endpoint;
-      this.fallback = new HeuristicAIClassifierProvider();
-    }
-
-    async classifyChannel(channelInfo = {}) {
-      if (!this.apiKey || !this.endpoint) {
-        return this.fallback.classifyChannel(channelInfo);
-      }
-      const titlesList =
-        Array.isArray(channelInfo.videoTitles) && channelInfo.videoTitles.length > 0
-          ? channelInfo.videoTitles.join("; ")
-          : channelInfo.videoTitle || "";
-
-      try {
-        const res = await fetch(this.endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-          body: JSON.stringify({
-            prompt: `Classify YouTube channel "${
-              channelInfo.channelName || channelInfo.channelId
-            }" based on video titles: [${titlesList}]. Return JSON with macro and micro category.`,
-          }),
-        });
-        const data = await res.json();
-        if (data && data.micro) {
-          return {
-            macro: data.macro || MICRO_MAP[data.micro] || "General",
-            micro: data.micro,
-            confidence: typeof data.confidence === "number" ? data.confidence : 0.9,
-            reason: data.reason || "Remote API classification",
-          };
-        }
-      } catch (err) {
-        console.error("[Stoic YouTube] Remote prediction failed, using local heuristic:", err);
-      }
-      return this.fallback.classifyChannel(channelInfo);
-    }
-  }
-
   class AIClassifierRegistry {
     constructor() {
       this.provider = new HeuristicAIClassifierProvider();
@@ -826,8 +762,9 @@
     if (!info.channelId && !info.channelName) return null;
 
     const force = options.forceReclassify === true;
-    const settings = await getAISettings();
-    const autoClassify = options.autoClassify !== undefined ? options.autoClassify : settings.autoClassify;
+    // Always on (audit item 21) — a caller can still opt out explicitly
+    // (nothing in this codebase does), but there is no user-facing switch.
+    const autoClassify = options.autoClassify !== undefined ? options.autoClassify : true;
 
     const store = await getChannelStore();
     // Do this before any early return: discovering the real channel ID for a
@@ -870,20 +807,10 @@
           return existing;
         }
 
-        let provider = options.provider;
-        if (!provider) {
-          provider =
-            settings.provider === "custom_api" && settings.apiKey && settings.apiEndpoint
-              ? new CustomAPIClassifierProvider({ apiKey: settings.apiKey, endpoint: settings.apiEndpoint })
-              : defaultAIClassifierRegistry.getProvider();
-        }
+        const provider = options.provider || defaultAIClassifierRegistry.getProvider();
 
         const threshold =
-          options.confidenceThreshold !== undefined
-            ? options.confidenceThreshold
-            : settings.confidenceThreshold !== undefined
-            ? settings.confidenceThreshold
-            : DEFAULT_AI_CONFIDENCE_THRESHOLD;
+          options.confidenceThreshold !== undefined ? options.confidenceThreshold : DEFAULT_AI_CONFIDENCE_THRESHOLD;
 
         const maxAttempts = options.maxRetries || 2;
         let prediction = null;
@@ -1121,7 +1048,7 @@
 
     classify(context, sites = null) {
       if (!context || !isYouTubeDomain(context.domain)) return null;
-      const { result } = resolveYouTubeClassification(
+      const { result, trace } = resolveYouTubeClassification(
         {
           domain: context.domain,
           videoId: context.videoId,
@@ -1132,12 +1059,15 @@
         },
         {
           sites,
-          // Tests and the debugger can inject a store explicitly; everything
-          // else reads the live snapshot.
+          // Tests and callers that already have a store loaded can inject
+          // one explicitly; everything else reads the live snapshot.
           channelStore: (context.metadata && context.metadata.channelStore) || this.options.channelStore,
           videoDb: (context.metadata && context.metadata.videoDb) || this.options.videoDb,
         }
       );
+      if (YT_DEBUG_TRACE) {
+        console.log(`[Stoic YouTube] ${context.domain} ->`, result ? result.toObject() : null, trace);
+      }
       return result;
     }
   }
@@ -1335,6 +1265,98 @@
   }
 
   // ==========================================================
+  // 9b. "Why was this counted as X?" (audit R5)
+  // ==========================================================
+  //
+  // Replaces the debugger: instead of a table of internal fields, one
+  // sentence, generated from the same precedence chain and the same day's
+  // attribution data live classification uses. Finds the single largest
+  // chunk of today's YouTube time — across the whole domain, or restricted
+  // to one macro/micro bucket — and explains how *that* chunk resolved.
+
+  function topAttributionMatch(sites, dayKey, { domain = null, matches = null } = {}) {
+    const opts = { sites, channelStore: getChannelStoreSync(), videoDb: getVideoDatabaseSync() };
+    let best = null;
+
+    Object.keys(sites || {}).forEach((d) => {
+      if (domain && d !== domain) return;
+      if (!isYouTubeDomain(d)) return;
+      const map = attributionMapFor(sites[d], dayKey);
+      if (!map) return;
+
+      Object.keys(map).forEach((key) => {
+        const seconds = Number(map[key]) || 0;
+        if (seconds <= 0) return;
+        const result = classificationForKey(key, opts);
+        if (!result) return; // the generic "browse" key has no story to tell
+        if (matches && !matches(result)) return;
+        if (!best || seconds > best.seconds) best = { domain: d, seconds, result };
+      });
+    });
+
+    return best;
+  }
+
+  function sentenceForAttribution(match, domain) {
+    if (!match) {
+      const fallback = domainTaxonomy(domain, null);
+      const label = common.MACRO_CATEGORIES[fallback.macro]?.label || fallback.macro;
+      return `Counted as ${label} because that's ${domain}'s default, and nothing watched today has been attributed to a specific channel yet.`;
+    }
+
+    const { result } = match;
+    const label = common.MACRO_CATEGORIES[result.macro]?.label || result.macro;
+    const who = result.metadata.channelName || result.metadata.channelId;
+
+    switch (result.source) {
+      case "manual_channel":
+        return `Counted as ${label} because you classified ${who ? `"${who}"` : "this channel"} as ${result.micro}.`;
+      case "builtin_channel":
+        return `Counted as ${label} because "${who}" is a known channel, classified as ${result.micro}.`;
+      case "manual_video":
+        return `Counted as ${label} because you classified this specific video as ${result.micro}.`;
+      case "predicted_channel":
+        return `Counted as ${label} because ${who ? `"${who}"` : "this channel"} was predicted to be ${result.micro} — nothing you set by hand.`;
+      case "predicted_video":
+        return `Counted as ${label} based on this video's own title — its channel hasn't been classified yet.`;
+      case "user_override":
+        return `Counted as ${label} because you set ${match.domain}'s default category to ${result.micro}.`;
+      default:
+        return `Counted as ${label} because that's ${match.domain}'s default, and ${who ? `"${who}"` : "this channel"} hasn't been classified yet.`;
+    }
+  }
+
+  // For a YouTube row in the domain audit table: what today's dominant
+  // attribution key for *that domain* resolved to, and why.
+  function explainDomainToday(domain, sites, dayKey = getTodayKey()) {
+    const match = topAttributionMatch(sites, dayKey, { domain });
+    const fallback = domainTaxonomy(domain, sites);
+    return {
+      macro: match ? match.result.macro : fallback.macro,
+      micro: match ? match.result.micro : fallback.micro,
+      channelId: match ? match.result.metadata.channelId || null : null,
+      channelName: match ? match.result.metadata.channelName || null : null,
+      sentence: sentenceForAttribution(match, domain),
+    };
+  }
+
+  // For a category-breakdown row: which YouTube-attributed chunk of time is
+  // actually behind this macro/micro bucket, if any. Returns null when
+  // nothing watched on YouTube today landed in this bucket — the caller
+  // should show no "Why?" control in that case, rather than a misleading one.
+  function explainCategoryToday(macro, micro, sites, dayKey = getTodayKey()) {
+    const match = topAttributionMatch(sites, dayKey, {
+      matches: (result) => result.macro === macro && result.micro === micro,
+    });
+    if (!match) return null;
+    return {
+      channelId: match.result.metadata.channelId || null,
+      channelName: match.result.metadata.channelName || null,
+      sentence: sentenceForAttribution(match, match.domain),
+    };
+  }
+
+  // ==========================================================
   // 10. Visit recording
   // ==========================================================
 
@@ -1407,9 +1429,6 @@
         videoDbSnapshot = changes[YT_VIDEOS_KEY].newValue || {};
         invalidateCache();
       }
-      if (Object.prototype.hasOwnProperty.call(changes, AI_SETTINGS_KEY)) {
-        inMemoryAISettings = { ...DEFAULT_AI_SETTINGS, ...(changes[AI_SETTINGS_KEY].newValue || {}) };
-      }
     });
   }
 
@@ -1417,13 +1436,11 @@
     // keys & vocabulary
     YT_CHANNELS_KEY,
     YT_VIDEOS_KEY,
-    AI_SETTINGS_KEY,
     CHANNEL_SOURCES,
     UNCLASSIFIED_MICRO,
     MAX_VIDEOS_RETAINED,
     MAX_ATTRIBUTION_KEYS_PER_DAY,
     BUILT_IN_CHANNEL_CLASSIFICATIONS,
-    DEFAULT_AI_SETTINGS,
     DEFAULT_AI_CONFIDENCE_THRESHOLD,
 
     // helpers
@@ -1459,13 +1476,10 @@
     clearVideoDatabase,
 
     // prediction
-    getAISettings,
-    saveAISettings,
     predictFromText,
     HEURISTIC_RULES,
     BaseChannelPredictionProvider,
     HeuristicAIClassifierProvider,
-    CustomAPIClassifierProvider,
     AIClassifierRegistry,
     defaultAIClassifierRegistry,
     predictChannelClassification,
@@ -1479,8 +1493,11 @@
     attributionKeyForContext,
     creditYouTubeSeconds,
     attributionMapFor,
+    classificationForKey,
     resolveYouTubeSegments,
     youtubeCategoryTotals,
+    explainDomainToday,
+    explainCategoryToday,
 
     // lifecycle
     recordYouTubeVisit,

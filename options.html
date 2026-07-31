@@ -27,45 +27,29 @@
 
   <!-- Navigation Tabs -->
   <nav class="options-nav" role="tablist">
-    <button class="nav-tab active" data-target="tab-overview" role="tab" aria-selected="true">
+    <button class="nav-tab active" data-target="tab-today" role="tab" aria-selected="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Overview
+      Today
     </button>
-    <button class="nav-tab" data-target="tab-progress" role="tab" aria-selected="false">
+    <button class="nav-tab" data-target="tab-record" role="tab" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
-      Progress
-    </button>
-    <button class="nav-tab" data-target="tab-analysis" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Analysis
-    </button>
-    <button class="nav-tab" data-target="tab-categories" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      Categories
+      Record
     </button>
     <button class="nav-tab" data-target="tab-rules" role="tab" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Rules
     </button>
-    <button class="nav-tab" data-target="tab-youtube-debug" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.5 15 12l-5 2.5z"/></svg>
-      YouTube
-    </button>
-    <button class="nav-tab" data-target="tab-sync" role="tab" aria-selected="false">
+    <button class="nav-tab" data-target="tab-settings" role="tab" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
-    </button>
-    <button class="nav-tab" data-target="tab-backup" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Backup
     </button>
   </nav>
 
   <!-- Main Content Sections -->
   <main class="options-main">
 
-    <!-- TAB 1: OVERVIEW -->
-    <section class="tab-panel active" id="tab-overview" role="tabpanel">
+    <!-- TAB 1: TODAY (was Overview + Progress's "today's standing") -->
+    <section class="tab-panel active" id="tab-today" role="tabpanel">
 
       <!-- HERO SECTION: Visual Anchor & Focus Score Component -->
       <div class="hero-anchor-section">
@@ -96,6 +80,11 @@
         <div class="top-websites-list" id="optTopWebsitesList"></div>
       </div>
 
+      <div class="overview-section">
+        <h2 class="overview-section-title">Today's standing</h2>
+        <div class="card card-secondary" id="progStandingContainer"></div>
+      </div>
+
       <!-- BEHAVIOUR SUMMARY SECTION (Part 4 Compact Metrics Row) -->
       <div class="overview-section">
         <h2 class="overview-section-title">The two numbers worth carrying</h2>
@@ -118,16 +107,15 @@
     </section>
 
 
-    <!-- TAB 2: PROGRESS -->
-    <section class="tab-panel" id="tab-progress" role="tabpanel" hidden>
+    <!-- TAB 2: RECORD (was Progress minus today's standing, + Detailed
+         Analysis + Categories). Composition/hero promotion is Phase 3 —
+         this pass only relocates the panels. -->
+    <section class="tab-panel" id="tab-record" role="tabpanel" hidden>
       <div class="dashboard-section">
         <div id="progLevelUpBannerOptions"></div>
 
         <h2 class="section-title">Identity</h2>
         <div class="card" id="progIdentityContainer"></div>
-
-        <h2 class="section-title">Today's standing</h2>
-        <div class="card card-secondary" id="progStandingContainer"></div>
 
         <h2 class="section-title">Streaks</h2>
         <div class="card card-secondary" id="progStreaksContainer"></div>
@@ -143,13 +131,7 @@
 
         <h2 class="section-title">Lifetime statistics</h2>
         <div class="card card-secondary" id="progLifetimeContainer"></div>
-      </div>
-    </section>
 
-
-    <!-- TAB 2: DETAILED ANALYSIS -->
-    <section class="tab-panel" id="tab-analysis" role="tabpanel" hidden>
-      <div class="dashboard-section">
         <h2 class="section-title">Session Insights & Distribution</h2>
 
         <!-- Today's AI Insight Card -->
@@ -171,6 +153,17 @@
           <div class="analytics-chart" id="optAnalyticsChart"></div>
         </div>
 
+        <h2 class="section-title">Browsing Activity Breakdown</h2>
+        <div class="card card-secondary">
+          <div class="card-header-flex">
+            <div>
+              <h3>How the day split</h3>
+              <p class="card-desc">Productive, general and leisure time, as classified today.</p>
+            </div>
+          </div>
+          <div class="category-grid" id="optCategoryGrid"></div>
+        </div>
+
         <!-- Websites Visited Audit Table -->
         <div class="card card-secondary">
           <div class="card-header-flex">
@@ -185,25 +178,8 @@
     </section>
 
 
-    <!-- TAB 3: CATEGORIES -->
-    <section class="tab-panel" id="tab-categories" role="tabpanel" hidden>
-      <div class="dashboard-section">
-        <h2 class="section-title">Browsing Activity Breakdown</h2>
-
-        <div class="card card-secondary">
-          <div class="card-header-flex">
-            <div>
-              <h3>How the day split</h3>
-              <p class="card-desc">Productive, general and leisure time, as classified today.</p>
-            </div>
-          </div>
-          <div class="category-grid" id="optCategoryGrid"></div>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- TAB 4: RULES -->
+    <!-- TAB 3: RULES (unchanged, plus the YouTube channel table — audit R4:
+         "they are rules about what counts as what") -->
     <section class="tab-panel" id="tab-rules" role="tabpanel" hidden>
       <div class="dashboard-section">
         <div class="panel-header">
@@ -254,12 +230,50 @@
           <p>No site moderation rules configured yet.</p>
           <button class="btn-ghost" id="optCreateFirstBtn">Add your first moderation rule</button>
         </div>
+
+        <!-- What counts as what on YouTube (moved from the deleted debugger
+             tab — audit R4/R5, Part 5.5). Only the channel table survives;
+             the live inspector, precedence trace and AI settings are gone. -->
+        <div class="panel-header mt-5">
+          <div>
+            <h2 class="section-title">What counts as what on YouTube</h2>
+            <p class="panel-desc">Stoic tells a lecture apart from a prank video, so a productive hour on YouTube is not filed as leisure. Channels you've classified here override everything else.</p>
+          </div>
+          <button class="btn-primary btn-accent" type="button" id="addChannelBtn">+ Add / Classify Channel</button>
+        </div>
+
+        <div class="card settings-card">
+          <div class="card-header-flex">
+            <div>
+              <h3>Channels you have classified</h3>
+              <p class="card-desc">Channels you have told Stoic what to count as.</p>
+            </div>
+            <button class="btn-ghost-danger" type="button" id="resetChannelDbBtn" title="Wipe all channel classifications">Clear Channel DB</button>
+          </div>
+          <div class="table-wrapper mt-4">
+            <table class="table" id="channelsTable">
+              <thead>
+                <tr>
+                  <th>Channel ID / Name</th>
+                  <th>Classification</th>
+                  <th>Authority & Rationale</th>
+                  <th>Confidence</th>
+                  <th>Last Updated</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="channelsTableBody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 
 
-    <!-- TAB 5: PREFERENCES & SYNC -->
-    <section class="tab-panel" id="tab-sync" role="tabpanel" hidden>
+    <!-- TAB 4: SETTINGS (was Preferences + Backup + Danger Zone) -->
+    <section class="tab-panel" id="tab-settings" role="tabpanel" hidden>
       <div class="dashboard-section">
         <h2 class="section-title">Settings</h2>
 
@@ -281,7 +295,7 @@
         <div class="card settings-card">
           <h3>Appearance</h3>
           <p class="card-desc">Light, dark, or whatever the system is set to. One palette, two modes.</p>
-          
+
           <div class="segmented measure-narrow mt-3" id="optThemeSeg">
             <button class="seg-btn" data-value="light" type="button">Light</button>
             <button class="seg-btn" data-value="dark" type="button">Dark</button>
@@ -292,7 +306,7 @@
         <div class="card settings-card">
           <h3>When a daily limit runs out</h3>
           <p class="card-desc">What happens by default on a site whose daily limit is spent.</p>
-          
+
           <div class="segmented measure-narrow mt-3" id="optDefaultActionSeg">
             <button class="seg-btn active" data-value="page">Reality-Check Page</button>
             <button class="seg-btn" data-value="redirect">Custom Redirect URL</button>
@@ -326,14 +340,8 @@
             <p class="card-desc field-hint-tight">A day is only held if the focus score reaches this value — waived on a day with under 30 minutes tracked.</p>
           </div>
         </div>
-      </div>
-    </section>
 
-
-    <!-- TAB 6: BACKUP & IMPORT -->
-    <section class="tab-panel" id="tab-backup" role="tabpanel" hidden>
-      <div class="dashboard-section">
-        <h2 class="section-title">Backup & Restore</h2>
+        <h2 class="section-title mt-5">Backup & Restore</h2>
 
         <div class="grid-2col">
           <div class="card settings-card">
@@ -355,191 +363,6 @@
           <h3>Danger Zone</h3>
           <p>Removes every rule and the whole time history. Your record — level, streaks and achievements — is kept. This cannot be undone.</p>
           <button class="btn-danger" id="optResetAllBtn" type="button">Reset All Data & Clear History</button>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- TAB 6: YOUTUBE & CLASSIFICATION DEBUGGER -->
-    <section class="tab-panel" id="tab-youtube-debug" role="tabpanel" hidden>
-      <div class="dashboard-section">
-        <div class="panel-header">
-          <div>
-            <h2 class="section-title">What counts as what on YouTube</h2>
-            <p class="panel-desc">Stoic tells a lecture apart from a prank video, so a productive hour on YouTube is not filed as leisure. This is where you correct it when it gets one wrong.</p>
-          </div>
-          <button class="btn-ghost" type="button" id="refreshDebugBtn">Refresh Inspector</button>
-        </div>
-
-        <!-- Live Inspector Card -->
-        <div class="card settings-card">
-          <h3>What Stoic can see in the open tab</h3>
-          <div class="yt-debug-grid" style="margin-top: 14px;">
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Extracted Video ID</div>
-              <div class="debug-card-val" id="optDbgVideoId">--</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Video Title</div>
-              <div class="debug-card-val" id="optDbgTitle">--</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Channel Name & ID</div>
-              <div class="debug-card-val" id="optDbgChannel">--</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Content Type</div>
-              <div class="debug-card-val" id="optDbgContentType">--</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Channel DB Lookup</div>
-              <div class="debug-card-val" id="optDbgChannelLookup">MISS</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Cache Status</div>
-              <div class="debug-card-val" id="optDbgCacheStatus">MISS</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Classification Source</div>
-              <div class="debug-card-val" id="optDbgSource">domain_rule</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Confidence Score</div>
-              <div class="debug-card-val" id="optDbgConfidence">80%</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Resolved Category</div>
-              <div class="debug-card-val" id="optDbgCategory">--</div>
-            </div>
-            <div class="yt-debug-card">
-              <div class="debug-card-lbl">Time Attributed To</div>
-              <div class="debug-card-val" id="optDbgAttribution">--</div>
-            </div>
-          </div>
-
-          <div class="debug-trace-block">
-            <div class="debug-card-lbl" style="margin-bottom: 8px;">Precedence Chain</div>
-            <ol class="debug-trace" id="optDbgTrace">
-              <li class="debug-trace-empty">Open a YouTube tab and refresh the inspector to see how its category was decided.</li>
-            </ol>
-          </div>
-        </div>
-
-        <!-- Downstream propagation: today's YouTube time by category -->
-        <div class="card settings-card">
-          <h3>Today's YouTube Time by Category</h3>
-          <p class="card-desc">How this subsystem's classifications are actually being counted in your focus score and analytics right now.</p>
-          <div id="optYtCategoryTotals" class="yt-category-totals">
-            <div class="yt-totals-empty">No YouTube time tracked today yet.</div>
-          </div>
-        </div>
-
-        <!-- AI Engine Settings Card -->
-        <div class="card settings-card">
-          <h3>AI Engine & Auto-Classification Settings</h3>
-          <p class="card-desc">Configure the AI provider, confidence thresholds, and background channel classification behaviors.</p>
-
-          <form id="aiSettingsForm" style="margin-top: 14px; display: grid; gap: 14px;">
-            <div class="field-row spread">
-              <div>
-                <label for="aiProviderSelect" class="field-label">AI Classifier Provider</label>
-                <div class="field-hint">Choose local heuristic analysis or custom remote LLM API.</div>
-              </div>
-              <select id="aiProviderSelect" class="field" style="max-width: 240px;">
-                <option value="heuristic">Local Heuristic (Fast & Offline)</option>
-                <option value="custom_api">Custom Remote AI API</option>
-              </select>
-            </div>
-
-            <div id="customApiFieldsGroup" class="subfields-panel" style="display: none;">
-              <div>
-                <label for="aiApiKey" class="field-label">API Key</label>
-                <input type="password" id="aiApiKey" class="field" placeholder="sk-..." />
-              </div>
-              <div style="margin-top: 8px;">
-                <label for="aiApiEndpoint" class="field-label">API Endpoint URL</label>
-                <input type="url" id="aiApiEndpoint" class="field" placeholder="https://api.example.com/v1/classify" />
-              </div>
-            </div>
-
-            <div class="field-row spread">
-              <div>
-                <label for="aiConfidenceThreshold" class="field-label">Confidence Acceptance Threshold</label>
-                <div class="field-hint">Classifications with confidence below this threshold fall back to Unclassified.</div>
-              </div>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="range" id="aiConfidenceThreshold" min="0.50" max="0.95" step="0.05" value="0.70" style="cursor: pointer;" />
-                <span id="aiConfidenceVal" style="font-family: var(--mono); font-weight: 700; font-size: 13px; min-width: 40px;">70%</span>
-              </div>
-            </div>
-
-            <div class="field-row spread">
-              <div>
-                <label for="aiAutoClassifyToggle" class="field-label">Automatic Background Channel Classification</label>
-                <div class="field-hint">Automatically classify unknown channels when visiting YouTube videos.</div>
-              </div>
-              <input type="checkbox" id="aiAutoClassifyToggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
-              <button type="submit" id="saveAiSettingsBtn" class="btn-primary btn-accent" style="padding: 6px 16px;">Save AI Settings</button>
-              <span id="aiSettingsNote" class="settings-note" role="status" aria-live="polite" style="display: none; margin: 0; font-size: 12px;"></span>
-            </div>
-          </form>
-        </div>
-
-        <!-- Channel Database Card -->
-        <div class="card settings-card">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div>
-              <h3>Channels you have classified</h3>
-              <p class="card-desc">Channels you have told Stoic what to count as. These override everything else.</p>
-            </div>
-            <div style="display: flex; gap: 8px;">
-              <button class="btn-ghost" type="button" id="resetChannelDbBtn" style="color: var(--missed-soft);" title="Wipe all channel classifications">Clear Channel DB</button>
-              <button class="btn-primary btn-accent" type="button" id="addChannelBtn">+ Add / Classify Channel</button>
-            </div>
-          </div>
-          <div class="table-wrapper" style="margin-top: 14px;">
-            <table class="table" id="channelsTable">
-              <thead>
-                <tr>
-                  <th>Channel ID / Name</th>
-                  <th>Classification</th>
-                  <th>Authority & Rationale</th>
-                  <th>Confidence</th>
-                  <th>Last Updated</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="channelsTableBody">
-                <!-- Rendered dynamically -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Video Database Log Card -->
-        <div class="card settings-card">
-          <h3>Videos seen recently</h3>
-          <p class="card-desc">Recent videos and the channel each was attributed to.</p>
-          <div class="table-wrapper" style="margin-top: 14px;">
-            <table class="table" id="videosTable">
-              <thead>
-                <tr>
-                  <th>Video ID</th>
-                  <th>Title</th>
-                  <th>Channel</th>
-                  <th>Resolved Category</th>
-                  <th>Extracted At</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="videosTableBody">
-                <!-- Rendered dynamically -->
-              </tbody>
-            </table>
-          </div>
         </div>
       </div>
     </section>
