@@ -487,6 +487,23 @@
           </div>
         </details>
 
+        <details class="disclosure mt-4">
+          <summary>Exceptions on specific days</summary>
+          <div>
+            <div class="section-label small">Allow a limited number of minutes on certain days, overriding the rule above just for those days — e.g. 10 minutes on Saturdays while the rest of the week stays closed.</div>
+            <div class="day-picker" id="optModalExceptionPicker">
+              <button class="day-btn" type="button" data-day="1">M</button>
+              <button class="day-btn" type="button" data-day="2">T</button>
+              <button class="day-btn" type="button" data-day="3">W</button>
+              <button class="day-btn" type="button" data-day="4">T</button>
+              <button class="day-btn" type="button" data-day="5">F</button>
+              <button class="day-btn" type="button" data-day="6">S</button>
+              <button class="day-btn" type="button" data-day="0">S</button>
+            </div>
+            <div id="optModalExceptionMinutes" class="mt-3"></div>
+          </div>
+        </details>
+
         <div class="modal-footer">
           <button class="btn-ghost" type="button" id="optModalCancelBtn">Cancel</button>
           <button class="btn-primary btn-accent" type="submit" id="optModalSaveBtn">Save Rule</button>

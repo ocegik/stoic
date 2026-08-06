@@ -219,16 +219,16 @@ async function tick() {
 
   let tripReason = null;
 
-  if (entry.mode === "block") {
+  if (activeRule.mode === "block") {
     tripReason = "blocked";
-  } else if (entry.mode === "restraint") {
+  } else if (activeRule.mode === "restraint") {
     const hasPass = await hasActiveRestraintPass(key, current.tabId);
     if (!hasPass) {
       tripReason = "restraint";
     } else {
       creditUsage(elapsedSeconds);
     }
-  } else if (entry.mode === "limit") {
+  } else if (activeRule.mode === "limit") {
     creditUsage(elapsedSeconds);
     const limitSeconds = (activeRule.limitMinutes || 0) * 60;
 

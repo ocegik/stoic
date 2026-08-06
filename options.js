@@ -133,6 +133,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optModalDayPicker = document.getElementById("optModalDayPicker");
   const optModalStartTime = document.getElementById("optModalStartTime");
   const optModalEndTime = document.getElementById("optModalEndTime");
+  const optModalExceptionPicker = document.getElementById("optModalExceptionPicker");
+  const optModalExceptionMinutes = document.getElementById("optModalExceptionMinutes");
 
   const optModalRestraintRow = document.getElementById("optModalRestraintRow");
 
@@ -292,6 +294,61 @@ document.addEventListener("DOMContentLoaded", async () => {
   const isLoosening = isLooseningRule;
 
   let modalMode = "limit";
+
+  // Per-day exceptions: minutes keyed by JS day index (0=Sun…6=Sat). Lets a
+  // site that's otherwise "always closed" or "pause first" carry a "but N
+  // minutes on Saturday" carve-out — see schedule.dayLimits / dayOverrideMinutes
+  // in common.js, which is what actually enforces this at runtime.
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  let exceptionMinutes = {};
+
+  function renderExceptionRows() {
+    optModalExceptionMinutes.innerHTML = "";
+    Object.keys(exceptionMinutes)
+      .sort((a, b) => Number(a) - Number(b))
+      .forEach((day) => {
+        const row = document.createElement("div");
+        row.className = "field-row";
+        row.innerHTML = `
+          <label>${DAY_NAMES[Number(day)]}</label>
+          <input class="field field-narrow" type="number" min="1" value="${exceptionMinutes[day]}" data-exception-day="${day}" />
+          <span class="unit">min/day</span>
+          <button class="btn-ghost btn-compact" type="button" data-remove-exception="${day}">Remove</button>
+        `;
+        optModalExceptionMinutes.appendChild(row);
+      });
+
+    optModalExceptionMinutes.querySelectorAll("[data-exception-day]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const day = input.getAttribute("data-exception-day");
+        exceptionMinutes[day] = Math.max(1, Number(input.value) || 1);
+      });
+    });
+    optModalExceptionMinutes.querySelectorAll("[data-remove-exception]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const day = btn.getAttribute("data-remove-exception");
+        delete exceptionMinutes[day];
+        optModalExceptionPicker.querySelectorAll(".day-btn").forEach((dayBtn) => {
+          if (dayBtn.getAttribute("data-day") === day) dayBtn.classList.remove("active");
+        });
+        renderExceptionRows();
+      });
+    });
+  }
+
+  optModalExceptionPicker.querySelectorAll(".day-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const day = btn.getAttribute("data-day");
+      const nowActive = !btn.classList.contains("active");
+      btn.classList.toggle("active", nowActive);
+      if (nowActive) {
+        if (!exceptionMinutes[day]) exceptionMinutes[day] = 10;
+      } else {
+        delete exceptionMinutes[day];
+      }
+      renderExceptionRows();
+    });
+  });
 
   function wireSegmented(container, onChange) {
     if (!container) return;
@@ -881,6 +938,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (isBlock) ruleText = "Blocked full day";
         else if (isRestraint) ruleText = "60s wait + puzzle + written reason";
 
+        const dayLimits = normalizeSchedule(entry.schedule).dayLimits;
+        const exceptionDays = Object.keys(dayLimits).sort((a, b) => Number(a) - Number(b));
+        if (exceptionDays.length) {
+          const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+          const parts = exceptionDays.map((d) => `${dayLimits[d]}m ${DAY_ABBR[Number(d)]}`);
+          ruleText += ` (except ${parts.join(", ")})`;
+        }
+
         const rule = getActiveRule(entry);
         const usedSec = usageSecondsForDate(entry, todayStr());
         const usedTodayStr = fmtMinutes(usedSec / 60);
@@ -999,6 +1064,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const d = Number(btn.getAttribute("data-day"));
         btn.classList.toggle("active", schedule.days.includes(d));
       });
+
+      exceptionMinutes = { ...schedule.dayLimits };
     } else {
       optModalTitle.textContent = "New Moderation Rule";
       optModalDomain.value = "";
@@ -1008,7 +1075,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       optModalStartTime.value = "";
       optModalEndTime.value = "";
       optModalDayPicker.querySelectorAll(".day-btn").forEach((btn) => btn.classList.add("active"));
+      exceptionMinutes = {};
     }
+
+    optModalExceptionPicker.querySelectorAll(".day-btn").forEach((btn) => {
+      const d = btn.getAttribute("data-day");
+      btn.classList.toggle("active", Object.prototype.hasOwnProperty.call(exceptionMinutes, d));
+    });
+    renderExceptionRows();
 
     optModalModeSeg.querySelectorAll(".seg-btn").forEach((btn) => {
       const isMatch = btn.getAttribute("data-value") === modalMode;
@@ -1045,10 +1119,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    const selectedDays = [];
+    const selectedDays = new Set();
     optModalDayPicker.querySelectorAll(".day-btn.active").forEach((btn) => {
-      selectedDays.push(Number(btn.getAttribute("data-day")));
+      selectedDays.add(Number(btn.getAttribute("data-day")));
     });
+    // A day carrying an exception has to be a scheduled day too, or the
+    // schedule considers it off entirely and the exception never fires.
+    Object.keys(exceptionMinutes).forEach((day) => selectedDays.add(Number(day)));
 
     const limitMin = Number(optModalMinutes.value) || 30;
     const existing = sites[rawDomain] || {};
@@ -1058,9 +1135,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       mode: modalMode,
       limitMinutes: modalMode === "limit" ? limitMin : 0,
       schedule: {
-        days: selectedDays,
+        days: Array.from(selectedDays),
         startTime: optModalStartTime.value || "",
         endTime: optModalEndTime.value || "",
+        dayLimits: { ...exceptionMinutes },
       },
       createdAt: existing.createdAt || todayStr(),
     };

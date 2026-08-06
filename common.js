@@ -213,11 +213,27 @@ function isWithinTimeWindow(entry, date = new Date()) {
   return nowMinutes >= start || nowMinutes < end;
 }
 
+// Days not present in `dayLimits` are governed by the entry's own `mode`.
+// A day that IS present is always treated as a limited-access exception for
+// that day, regardless of the base mode — this is what lets "always closed"
+// or "pause first" sites carry a "but N minutes on Saturday" carve-out
+// without needing a second rule per domain.
+const OVERRIDABLE_MODES = ["limit", "block", "restraint"];
+
+function dayOverrideMinutes(entry, date = new Date()) {
+  if (!OVERRIDABLE_MODES.includes(entry?.mode)) return null;
+  const schedule = normalizeSchedule(entry.schedule);
+  return schedule.dayLimits[String(date.getDay())] || null;
+}
+
 function limitMinutesForDate(entry, date = new Date()) {
   const fallback = cleanPositiveMinutes(entry?.limitMinutes) || 0;
-  if (entry?.mode !== "limit") return fallback;
-  const schedule = normalizeSchedule(entry.schedule);
-  return schedule.dayLimits[String(date.getDay())] || fallback;
+  return dayOverrideMinutes(entry, date) || fallback;
+}
+
+function effectiveModeForDate(entry, date = new Date()) {
+  const mode = entry?.mode || "unconstrained";
+  return dayOverrideMinutes(entry, date) ? "limit" : mode;
 }
 
 // Restraint Mode used to let a site owner pick from five "challenge types"
@@ -440,6 +456,13 @@ async function removeRestraintPassForTab(tabId) {
   }
 }
 
+// A throwaway local date whose getDay() is exactly `day` (0=Sun…6=Sat) — Jan
+// 1 2023 was a Sunday, so offsetting from it sidesteps DST/month-boundary
+// edge cases entirely. Only ever fed to functions that read getDay().
+function dateForDay(day) {
+  return new Date(2023, 0, 1 + day);
+}
+
 // The four rule strengths, ordered. "unconstrained" is the absence of a rule.
 const MODE_STRICTNESS = { unconstrained: 0, limit: 1, restraint: 2, block: 3 };
 
@@ -471,6 +494,21 @@ function isLooseningRule(oldEntry, newEntry) {
   if (newSchedule.days.length < oldSchedule.days.length) return true;
   if (oldSchedule.startTime && oldSchedule.endTime && (!newSchedule.startTime || !newSchedule.endTime)) return true;
 
+  // Per-day exceptions (dayLimits) can loosen a rule on their own — e.g.
+  // carving a "10 min on Saturday" exception into an otherwise "always
+  // closed" site, or simply raising an existing exception's minutes — even
+  // when none of the checks above fire. Walk each weekday's effective mode
+  // and minutes rather than just diffing the raw dayLimits maps, so this
+  // stays correct however the two entries otherwise differ.
+  for (let day = 0; day <= 6; day++) {
+    const oldDayRank = MODE_STRICTNESS[effectiveModeForDate(oldEntry, dateForDay(day))] ?? 0;
+    const newDayRank = MODE_STRICTNESS[effectiveModeForDate(newEntry, dateForDay(day))] ?? 0;
+    if (newDayRank < oldDayRank) return true;
+    if (newDayRank === oldDayRank && newDayRank === MODE_STRICTNESS.limit) {
+      if (limitMinutesForDate(newEntry, dateForDay(day)) > limitMinutesForDate(oldEntry, dateForDay(day))) return true;
+    }
+  }
+
   return false;
 }
 
@@ -482,7 +520,7 @@ function getActiveRule(entry, date = new Date()) {
     scheduledToday,
     withinHours,
     limitMinutes: limitMinutesForDate(entry, date),
-    mode: entry?.mode || "unconstrained",
+    mode: effectiveModeForDate(entry, date),
   };
 }
 
@@ -1895,6 +1933,8 @@ const api = {
   getThemePreference,
   setThemePreference,
   applyTheme,
+  effectiveModeForDate,
+  dateForDay,
 };
 
 if (typeof module !== "undefined" && module.exports) {

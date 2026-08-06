@@ -15,6 +15,8 @@ const {
   limitStreakDays,
   getDomainDisplayName,
   usageSecondsForDate,
+  effectiveModeForDate,
+  isLooseningRule,
 } = require("../common.js");
 
 test("getDomainDisplayName: prefers recognized brands, otherwise uses leftmost label", () => {
@@ -98,6 +100,57 @@ test("limitMinutesForDate: per-day limits override the default limit", () => {
   assert.equal(limitMinutesForDate(entry, new Date(2026, 6, 27)), 20); // Monday
   assert.equal(limitMinutesForDate(entry, new Date(2026, 7, 2)), 60); // Sunday
   assert.equal(limitMinutesForDate(entry, new Date(2026, 6, 29)), 30); // Wednesday
+});
+
+test("dayLimits on a blocked site carve out a limited-access exception for that day only", () => {
+  // "No Instagram all week, but 10 minutes on Saturday" — a block rule
+  // scheduled every day, with a per-day exception on Saturday (day 6).
+  const entry = {
+    mode: "block",
+    limitMinutes: 0,
+    schedule: { days: [0, 1, 2, 3, 4, 5, 6], dayLimits: { "6": 10 } },
+  };
+
+  const friday = new Date(2026, 6, 24, 10, 0); // Friday
+  const saturday = new Date(2026, 6, 25, 10, 0); // Saturday
+
+  assert.equal(effectiveModeForDate(entry, friday), "block");
+  assert.equal(getActiveRule(entry, friday).mode, "block");
+
+  assert.equal(effectiveModeForDate(entry, saturday), "limit");
+  const saturdayRule = getActiveRule(entry, saturday);
+  assert.equal(saturdayRule.mode, "limit");
+  assert.equal(saturdayRule.limitMinutes, 10);
+  assert.equal(saturdayRule.active, true);
+});
+
+test("isLooseningRule: adding or growing a day exception on a block/restraint site requires the friction gate", () => {
+  const blockedAllWeek = {
+    mode: "block",
+    limitMinutes: 0,
+    schedule: { days: [0, 1, 2, 3, 4, 5, 6], dayLimits: {} },
+  };
+
+  const withSaturdayException = {
+    ...blockedAllWeek,
+    schedule: { days: [0, 1, 2, 3, 4, 5, 6], dayLimits: { "6": 10 } },
+  };
+  assert.equal(isLooseningRule(blockedAllWeek, withSaturdayException), true);
+
+  const biggerException = {
+    ...blockedAllWeek,
+    schedule: { days: [0, 1, 2, 3, 4, 5, 6], dayLimits: { "6": 30 } },
+  };
+  assert.equal(isLooseningRule(withSaturdayException, biggerException), true);
+
+  const smallerException = {
+    ...blockedAllWeek,
+    schedule: { days: [0, 1, 2, 3, 4, 5, 6], dayLimits: { "6": 5 } },
+  };
+  assert.equal(isLooseningRule(withSaturdayException, smallerException), false);
+
+  const removedException = { ...blockedAllWeek, schedule: { days: [0, 1, 2, 3, 4, 5, 6], dayLimits: {} } };
+  assert.equal(isLooseningRule(withSaturdayException, removedException), false);
 });
 
 test("trailingWeekUsage: combines six history days with today", () => {
