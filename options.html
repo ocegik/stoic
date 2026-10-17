@@ -38,18 +38,27 @@
         </div>
       </div>
 
+      <section class="hero">
+        <div class="hero-ring" id="optFocusRing"></div>
+        <div class="hero-main">
+          <span class="hero-eyebrow">Today so far</span>
+          <div class="hero-big"><span id="optTodayTotal">—</span><small>tracked</small></div>
+          <div class="hero-split" id="optTodaySplit"></div>
+          <span class="hero-sub" id="optTodayVsAvg"></span>
+        </div>
+        <div class="hero-side" id="optHeroSide"></div>
+      </section>
+
       <div class="kpis">
         <div class="kpi">
-          <span class="kpi-label">Tracked</span>
-          <span class="kpi-value" id="optTodayTotal">—</span>
-          <div class="meter meter-split" id="optTodaySplit"></div>
-          <span class="kpi-sub" id="optTodayVsAvg"></span>
+          <span class="kpi-label">Sites visited</span>
+          <span class="kpi-value" id="optSitesVisited">—</span>
+          <span class="kpi-sub">today</span>
         </div>
         <div class="kpi">
-          <span class="kpi-label">Focus score</span>
-          <span class="kpi-value" id="optFocusScore">—</span>
-          <div class="meter"><div class="meter-fill" id="optFocusMeter"></div></div>
-          <span class="kpi-sub" id="optFocusScoreSub"></span>
+          <span class="kpi-label">Rules in force</span>
+          <span class="kpi-value" id="optRulesInForce">—</span>
+          <span class="kpi-sub" id="optRulesInForceSub"></span>
         </div>
         <div class="kpi">
           <span class="kpi-label">Stopped by a rule</span>
@@ -93,15 +102,13 @@
         </div>
       </div>
 
-      <details class="panel disclosure-panel">
-        <summary class="panel-head">
-          <span>
-            <span class="panel-title">Every site today</span>
-            <span class="panel-meta">Change a category here and today's numbers update.</span>
-          </span>
-        </summary>
+      <section class="panel">
+        <header class="panel-head">
+          <h2 class="panel-title">Every site today</h2>
+          <span class="panel-meta">Change a category here and today's numbers update.</span>
+        </header>
         <div id="optDomainAuditTable" class="table-wrapper"></div>
-      </details>
+      </section>
     </section>
 
     <!-- ============ RECORD ============ -->
@@ -109,22 +116,25 @@
       <div class="page-head">
         <div>
           <h1 class="page-title">Your record</h1>
-          <p class="page-sub verdict" id="recVerdict"></p>
+          <p class="page-sub" id="recVerdict"></p>
         </div>
-        <div class="segmented period-seg" id="recPeriodSeg" role="group" aria-label="Period">
-          <button class="seg-btn active" type="button" data-value="week">Week</button>
-          <button class="seg-btn" type="button" data-value="month">Month</button>
-          <button class="seg-btn" type="button" data-value="year">Year</button>
+        <div class="period-controls">
+          <div class="period-nav">
+            <button class="icon-btn" type="button" id="recPrevBtn" aria-label="Previous period">&#8249;</button>
+            <span class="period-label" id="recPeriodLabel" aria-live="polite"></span>
+            <button class="icon-btn" type="button" id="recNextBtn" aria-label="Next period">&#8250;</button>
+          </div>
+          <div class="segmented period-seg" id="recPeriodSeg" role="group" aria-label="Period">
+            <button class="seg-btn active" type="button" data-value="week">Week</button>
+            <button class="seg-btn" type="button" data-value="month">Month</button>
+            <button class="seg-btn" type="button" data-value="year">Year</button>
+          </div>
         </div>
       </div>
 
       <div id="progLevelUpBannerOptions" class="banner-slot"></div>
 
-      <div class="period-nav">
-        <button class="icon-btn" type="button" id="recPrevBtn" aria-label="Previous period">&#8249;</button>
-        <span class="period-label" id="recPeriodLabel" aria-live="polite"></span>
-        <button class="icon-btn" type="button" id="recNextBtn" aria-label="Next period">&#8250;</button>
-      </div>
+      <section class="hero" id="recHero"></section>
 
       <div class="kpis" id="recSummary"></div>
 
@@ -145,7 +155,16 @@
         <p class="panel-foot">A day is held when every rule held, leisure stayed under the ceiling and focus met the target. Hover a day for its full breakdown.</p>
       </section>
 
+      <div class="stat-strip" id="recStats"></div>
+
       <div class="cols">
+        <section class="panel">
+          <header class="panel-head">
+            <h2 class="panel-title">Focus, day by day</h2>
+            <span class="panel-meta" id="recFocusMeta"></span>
+          </header>
+          <div id="recFocus"></div>
+        </section>
         <section class="panel">
           <header class="panel-head">
             <h2 class="panel-title">Where the time went</h2>
@@ -153,21 +172,29 @@
           </header>
           <div id="recSplit"></div>
         </section>
+      </div>
+
+      <div class="cols">
         <section class="panel">
+          <header class="panel-head"><h2 class="panel-title">Level and streaks</h2></header>
           <div id="progIdentityContainer"></div>
           <hr class="hairline panel-rule" />
           <div id="progStreaksContainer"></div>
         </section>
+        <section class="panel">
+          <header class="panel-head"><h2 class="panel-title">Personal records</h2></header>
+          <div id="progRecordsContainer"></div>
+        </section>
       </div>
 
-      <details class="panel disclosure-panel" id="recMore">
-        <summary class="panel-head"><span class="panel-title">Records, achievements and lifetime totals</span></summary>
-        <h3 class="sub-title">Personal records</h3>
-        <div id="progRecordsContainer"></div>
-        <div id="progAchievementsContainer" class="mt-5"></div>
-        <h3 class="sub-title">Lifetime</h3>
+      <section class="panel">
+        <div id="progAchievementsContainer"></div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-head"><h2 class="panel-title">Lifetime</h2></header>
         <div id="progLifetimeContainer"></div>
-      </details>
+      </section>
     </section>
 
     <!-- ============ RULES ============ -->
@@ -199,13 +226,11 @@
 
       <p class="rules-note">Tightening a rule is free. Loosening, suspending or deleting one costs the same sixty seconds as pushing through it.</p>
 
-      <details class="panel disclosure-panel" id="ytPanel">
-        <summary class="panel-head">
-          <span>
-            <span class="panel-title">What counts as what on YouTube</span>
-            <span class="panel-meta" id="ytChannelCount"></span>
-          </span>
-        </summary>
+      <section class="panel" id="ytPanel">
+        <header class="panel-head">
+          <h2 class="panel-title">What counts as what on YouTube</h2>
+          <span class="panel-meta" id="ytChannelCount"></span>
+        </header>
         <p class="panel-desc">Stoic tells a lecture apart from a prank video, so a productive hour on YouTube isn't filed as leisure. A channel you classify here always counts the way you said.</p>
         <div class="panel-actions">
           <button class="btn-ghost" type="button" id="addChannelBtn">Classify a channel</button>
@@ -224,7 +249,7 @@
             <tbody id="channelsTableBody"></tbody>
           </table>
         </div>
-      </details>
+      </section>
     </section>
 
     <!-- ============ SETTINGS ============ -->

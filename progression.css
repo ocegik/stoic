@@ -142,16 +142,8 @@
 .prog-record-meta { grid-column: 1 / -1; font-size: var(--text-xs); color: var(--text-faint); }
 
 /* ---- achievements ---- */
-.prog-achievements summary {
-  cursor: pointer;
-  list-style: none;
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: var(--text-lg); font-weight: 600;
-}
-.prog-achievements summary::-webkit-details-marker { display: none; }
-.prog-achievements summary::after { content: "Show"; font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); }
-.prog-achievements[open] summary::after { content: "Hide"; }
-.prog-achievements-count { font-family: var(--mono); font-size: var(--text-sm); font-weight: 500; color: var(--text-muted); margin-left: var(--space-2); }
+.prog-achievements .panel-head { margin-bottom: var(--space-3); }
+.prog-achievements-count { font-family: var(--mono); font-size: var(--text-sm); font-weight: 500; color: var(--earned); }
 .prog-achievement-group { margin-top: var(--space-5); }
 .prog-achievement-grid {
   display: grid;

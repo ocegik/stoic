@@ -377,6 +377,19 @@ function liveDayFromSites(key, sites) {
   return { t, p, g, l, f: t > 0 ? calculateFocusScore(sites, key) : null };
 }
 
+// Today's refusals, counted the way settlement counts them
+// (progression-engine.js buildDaySnapshot): gates shown minus passed, capped
+// per domain.
+function liveRefusals(state) {
+  const shown = (state.today && state.today.gatesShown) || {};
+  const passed = (state.today && state.today.gatesPassed) || {};
+  let total = 0;
+  for (const domain of Object.keys(shown)) {
+    total += Math.min(Math.max((shown[domain] || 0) - (passed[domain] || 0), 0), REFUSAL_MAX_PER_DOMAIN_PER_DAY);
+  }
+  return total;
+}
+
 // One entry per calendar day in [start, end]. status: held | partial |
 // missed | none | future. `live` marks a day built from `sites`.
 function buildPeriodDays(state, sites, start, end) {
@@ -388,7 +401,7 @@ function buildPeriodDays(state, sites, start, end) {
   for (let date = new Date(start); date <= end; date = addDays(date, 1)) {
     const key = dateKey(date);
     if (key > todayKey) {
-      out.push({ key, date, status: "future", t: 0, p: 0, g: 0, l: 0, f: null });
+      out.push({ key, date, status: "future", t: 0, p: 0, g: 0, l: 0, f: null, gs: 0, r: 0, v: 0 });
       continue;
     }
     const rec = key === todayKey ? null : byDate.get(key);
@@ -401,17 +414,27 @@ function buildPeriodDays(state, sites, start, end) {
         key, date, t, p, l,
         g: rec.g != null ? rec.g : Math.max(0, t - p - l),
         f: t > 0 ? rec.f : null,
+        gs: rec.gs || 0,
+        r: rec.r || 0,
+        v: rec.v || 0,
         status: status === "absent" ? "none" : status,
       });
       continue;
     }
     const live = liveDayFromSites(key, sites);
     let status = "none";
-    if (key === todayKey && live.t > 0) {
-      const c = buildLiveDayView(sites, state).conditions;
-      if (!c.absent) status = c.held ? "held" : (c.c1 || c.c2 || c.c3) ? "partial" : "missed";
+    let gs = 0;
+    let r = 0;
+    let v = 0;
+    if (key === todayKey) {
+      const view = buildLiveDayView(sites, state);
+      const c = view.conditions;
+      if (live.t > 0 && !c.absent) status = c.held ? "held" : (c.c1 || c.c2 || c.c3) ? "partial" : "missed";
+      gs = view.snapshot.gatesShown;
+      v = view.snapshot.violations;
+      r = liveRefusals(state);
     }
-    out.push({ key, date, ...live, status, live: true });
+    out.push({ key, date, ...live, gs, r, v, status, live: true });
   }
   return out;
 }
@@ -420,14 +443,24 @@ function buildPeriodDays(state, sites, start, end) {
 // the same formula as calculateFocusScore, so a period score is exactly what
 // one long day with that mix would score — not an average of averages.
 function summarizePeriod(days) {
-  const sum = { t: 0, p: 0, g: 0, l: 0, active: 0, held: 0, settled: 0 };
+  const sum = {
+    t: 0, p: 0, g: 0, l: 0, gs: 0, r: 0, v: 0, active: 0, held: 0, settled: 0,
+    longest: null, mostProductive: null, bestFocus: null,
+  };
   for (const d of days) {
     if (d.status === "future") continue;
     sum.t += d.t;
     sum.p += d.p;
     sum.g += d.g;
     sum.l += d.l;
+    sum.gs += d.gs || 0;
+    sum.r += d.r || 0;
+    sum.v += d.v || 0;
     if (d.t > 0) sum.active++;
+    if (d.t > 0 && (!sum.longest || d.t > sum.longest.t)) sum.longest = d;
+    if (d.p > 0 && (!sum.mostProductive || d.p > sum.mostProductive.p)) sum.mostProductive = d;
+    // Focus is waived under 30 minutes; a 5-minute day must not be the "best".
+    if (d.f != null && d.t >= MIN_TRACKED_MINUTES_FOR_FOCUS * 60 && (!sum.bestFocus || d.f > sum.bestFocus.f)) sum.bestFocus = d;
     if (!d.live && d.status !== "none") {
       sum.settled++;
       if (d.status === "held") sum.held++;
@@ -489,6 +522,24 @@ function renderMonthCalendar(days, todayKey) {
     </div>`).join("");
   const head = WEEKDAY_ABBR.map((w) => `<span class="cal-head">${w}</span>`).join("");
   return `<div class="cal">${head}${blanks}${cells}</div>`;
+}
+
+// Focus, one bar per day, coloured by tier, against the target line.
+function renderFocusBars(days, target, todayKey) {
+  const bars = days.map((d) => {
+    const scored = d.f != null && d.t >= MIN_TRACKED_MINUTES_FOR_FOCUS * 60;
+    const tier = !scored ? "" : d.f >= target ? "is-held" : d.f >= target - 15 ? "is-partial" : "is-missed";
+    const label = d.date.toLocaleDateString([], { month: "short", day: "numeric" });
+    return `<div class="fb-col${d.key === todayKey ? " is-today" : ""}" title="${label} · ${scored ? `focus ${d.f}` : d.status === "future" ? "to come" : "under 30m tracked"}">
+      <div class="fb-bar ${tier}" style="height:${scored ? Math.max(3, d.f) : 0}%"></div>
+    </div>`;
+  }).join("");
+  return `
+    <div class="fb" style="--fb-target:${target}%">
+      <div class="fb-target" aria-hidden="true"><span>Target ${target}</span></div>
+      ${bars}
+    </div>
+    <div class="fb-axis"><span>${days[0].date.toLocaleDateString([], { month: "short", day: "numeric" })}</span><span>${days[days.length - 1].date.toLocaleDateString([], { month: "short", day: "numeric" })}</span></div>`;
 }
 
 // Where the period's time went, by category.
@@ -591,8 +642,12 @@ function renderAchievements(state) {
     .join("");
 
   return `
-    <details class="prog-achievements">
-      <summary>Achievements<span class="prog-achievements-count">${earned.length} of ${ACHIEVEMENTS.length} earned</span></summary>
+    <div class="prog-achievements">
+      <header class="panel-head">
+        <h2 class="panel-title">Achievements</h2>
+        <span class="prog-achievements-count">${earned.length} of ${ACHIEVEMENTS.length} earned</span>
+      </header>
+      <div class="prog-xp-bar"><div class="prog-xp-bar-fill" style="width:${Math.round((earned.length / ACHIEVEMENTS.length) * 100)}%;"></div></div>
       <div class="prog-achievement-group">
         <div class="section-label small">Earned</div>
         <div class="prog-achievement-grid">${earnedHtml}</div>
@@ -601,7 +656,7 @@ function renderAchievements(state) {
         <div class="section-label small">Still to earn</div>
         <div class="prog-achievement-grid">${lockedHtml}</div>
       </div>
-    </details>
+    </div>
   `;
 }
 
@@ -678,6 +733,7 @@ const progressionUiApi = {
   renderWeekBars,
   renderMonthCalendar,
   renderPeriodSplit,
+  renderFocusBars,
 };
 
 if (typeof module !== "undefined" && module.exports) {

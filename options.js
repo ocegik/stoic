@@ -76,7 +76,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Overview Page Refs
   const optTodayTotal = document.getElementById("optTodayTotal");
-  const optFocusScore = document.getElementById("optFocusScore");
   const optTopWebsitesList = document.getElementById("optTopWebsitesList");
   const optOverviewTrippedCount = document.getElementById("optOverviewTrippedCount");
   const optOverviewRefusals = document.getElementById("optOverviewRefusals");
@@ -578,23 +577,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const tracked = browsing.totalSeconds;
-    const focusMeter = document.getElementById("optFocusMeter");
-    const focusSub = document.getElementById("optFocusScoreSub");
-    if (optFocusScore) {
-      optFocusScore.textContent = tracked > 0 ? `${focusScore}` : "—";
-      optFocusScore.className = `kpi-value ${tracked > 0 ? scoreTier(focusScore) : ""}`;
-    }
-    if (focusMeter) {
-      focusMeter.style.width = `${tracked > 0 ? focusScore : 0}%`;
-      focusMeter.className = `meter-fill ${scoreTier(focusScore)}`;
-    }
-    if (focusSub) {
+    const ringEl = document.getElementById("optFocusRing");
+    if (ringEl) {
       // Descriptive, never a verdict (docs/GLOSSARY.md §3).
-      focusSub.textContent = tracked === 0 ? "Nothing tracked yet"
-        : focusScore >= 70 ? "Mostly productive time"
-        : focusScore >= 45 ? "A mixed day so far"
-        : "Mostly leisure time";
+      const caption = tracked === 0 ? "Nothing yet"
+        : focusScore >= 70 ? "Mostly productive"
+        : focusScore >= 45 ? "A mixed day"
+        : "Mostly leisure";
+      ringEl.innerHTML = heroRing(tracked > 0 ? focusScore : null, "Focus", caption);
     }
+
+    const visitedEl = document.getElementById("optSitesVisited");
+    if (visitedEl) visitedEl.textContent = browsing.topWebsites.filter((w) => w.seconds > 0).length;
+    const ruleDomains = Object.keys(sites).filter((d) => entryHasRule(sites[d]));
+    const inForce = ruleDomains.filter((d) => ruleStatus(sites[d]).state === "active").length;
+    const inForceEl = document.getElementById("optRulesInForce");
+    if (inForceEl) inForceEl.textContent = inForce;
+    const inForceSub = document.getElementById("optRulesInForceSub");
+    if (inForceSub) inForceSub.textContent = ruleDomains.length ? `of ${ruleDomains.length} rule${ruleDomains.length === 1 ? "" : "s"}` : "no rules yet";
 
     const splitEl = document.getElementById("optTodaySplit");
     if (splitEl) {
@@ -630,15 +630,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!hadProg) renderDisciplines();
 
     if (progIdentityContainer) progIdentityContainer.innerHTML = renderLevelIdentity(prog);
+    const heroSide = document.getElementById("optHeroSide");
+    if (heroSide) heroSide.innerHTML = heroBadges(prog);
     if (progStandingContainer) progStandingContainer.innerHTML = renderTodayStanding(buildLiveDayView(sites, prog));
     if (progStreaksContainer) progStreaksContainer.innerHTML = renderStreaks(prog);
     renderRecord(prog);
     if (progRecordsContainer) progRecordsContainer.innerHTML = renderRecords(prog);
-    if (progAchievementsContainer) {
-      const wasOpen = !!progAchievementsContainer.querySelector("details[open]");
-      progAchievementsContainer.innerHTML = renderAchievements(prog);
-      if (wasOpen) progAchievementsContainer.querySelector("details").open = true;
-    }
+    if (progAchievementsContainer) progAchievementsContainer.innerHTML = renderAchievements(prog);
     if (progLifetimeContainer) progLifetimeContainer.innerHTML = renderLifetime(prog);
 
     if (progLevelUpBannerOptions) {
@@ -743,6 +741,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderAuditTable(browsing);
   }
 
+  // ---------- hero pieces (Today + Record) ----------
+
+  const ICON_FLAME = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2c.6 3.2 3.4 5 4.6 8.2 1.5 4-1 9.8-4.6 9.8s-6.6-2.6-5.9-6.6c.4-2.3 1.9-3.6 2.9-4.9.3 1.8 1 2.8 2.1 3.3-.6-3.5.1-6.6.9-9.8z"/></svg>`;
+  const ICON_STAR = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.6L12 17.2l-5.9 3.3 1.3-6.6L2.5 9.3l6.6-.8z"/></svg>`;
+
+  // A score ring. null means "no score", never 100.
+  function heroRing(score, label, caption) {
+    const r = 52;
+    const c = +(2 * Math.PI * r).toFixed(1);
+    const off = score == null ? c : +(c * (1 - score / 100)).toFixed(1);
+    return `
+      <svg viewBox="0 0 128 128" class="ring-svg">
+        <circle cx="64" cy="64" r="${r}" class="ring-track" />
+        <circle cx="64" cy="64" r="${r}" class="ring-fill" style="stroke-dasharray:${c};stroke-dashoffset:${off};--ring-c:${c}" />
+      </svg>
+      <div class="ring-label">
+        <span class="ring-value">${score == null ? "—" : score}</span>
+        <span class="ring-name">${label}</span>
+      </div>
+      ${caption ? `<span class="ring-caption">${caption}</span>` : ""}`;
+  }
+
+  function heroBadge(icon, value, label, cls = "") {
+    return `<div class="hero-badge ${cls}"><span class="hero-badge-icon">${icon}</span><span class="hero-badge-text"><b>${value}</b><span>${label}</span></span></div>`;
+  }
+
+  function heroBadges(prog) {
+    const streak = prog.streaks.discipline.current;
+    const lvl = xpProgressForLevel(prog.level.xp);
+    return heroBadge(ICON_FLAME, streak, `day streak · best ${prog.streaks.discipline.best}`, streak > 0 ? "is-hot" : "")
+      + heroBadge(ICON_STAR, `Level ${lvl.level}`, `${lvl.rank.name} · ${Math.round(lvl.pct)}% to next`);
+  }
+
+  // One pill per day: its verdict as a colour.
+  function dayPills(days, todayKey, compact) {
+    return `<div class="pills${compact ? " pills-compact" : ""}">${days.map((d) => `
+      <span class="pill pill-${d.status}${d.key === todayKey ? " is-today" : ""}" title="${d.date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} · ${d.status === "none" ? (d.t ? "not settled" : "no data") : d.status}">${compact ? "" : d.date.toLocaleDateString([], { weekday: "narrow" })}</span>`).join("")}</div>`;
+  }
+
   // ---------- Record tab ----------
   // Surface: four numbers and one picture of the period. Everything else
   // (hover breakdowns, records, achievements, lifetime) sits one step down.
@@ -804,12 +841,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
 
     setText("recPeriodLabel", periodLabel(recPeriod, start, end, recOffset));
-    setText("recVerdict", verdictSentence(recPeriod, sum, recOffset));
+    setText("recVerdict", "");
+    const focusCaption = prev && prev.focus != null && sum.focus != null
+      ? (sum.focus > prev.focus ? `↑ ${sum.focus - prev.focus} vs ${recPeriod === "week" ? "last week" : "last month"}`
+        : sum.focus < prev.focus ? `↓ ${prev.focus - sum.focus} vs ${recPeriod === "week" ? "last week" : "last month"}` : "Same as before")
+      : "Whole period";
+    setHtml("recHero", `
+      <div class="hero-ring">${heroRing(sum.focus, "Focus", focusCaption)}</div>
+      <div class="hero-main">
+        <span class="hero-eyebrow">${periodLabel(recPeriod, start, end, recOffset)}</span>
+        <p class="hero-verdict">${verdictSentence(recPeriod, sum, recOffset)}</p>
+        ${recPeriod === "year"
+          ? `<span class="hero-sub">${fmtDuration(sum.t)} tracked across ${sum.active} days</span>`
+          : dayPills(days, todayKey, recPeriod === "month")}
+      </div>
+      <div class="hero-side">
+        ${heroBadges(prog)}
+      </div>`);
     if (recPrevBtn) recPrevBtn.hidden = recPeriod === "year";
     if (recNextBtn) { recNextBtn.hidden = recPeriod === "year"; recNextBtn.disabled = recOffset >= 0; }
 
     const vs = recPeriod === "week" ? "last week" : "last month";
-    const pts = (n) => `${Math.round(n)} pts`;
     const heldPct = sum.settled ? Math.round((sum.held / sum.settled) * 100) : null;
     setHtml("recSummary", [
       summaryTile({
@@ -820,11 +872,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         sub: sum.settled ? `${heldPct}% of finished days` : "No finished days yet",
       }),
       summaryTile({
-        label: "Focus score",
-        value: sum.focus == null ? "—" : sum.focus,
-        cls: sum.focus == null ? "" : scoreTier(sum.focus),
-        meter: sum.focus,
-        sub: prev ? delta(sum.focus, prev.focus, { goodWhenUp: true, fmt: pts }) + (prev.focus != null && sum.focus != null ? ` vs ${vs}` : "") : "Whole period, by time",
+        label: "Productive time",
+        value: sum.p ? fmtDuration(sum.p) : "—",
+        cls: sum.p ? "is-accent" : "",
+        meter: sum.t ? Math.round((sum.p / sum.t) * 100) : null,
+        sub: prev && prev.active ? delta(sum.p, prev.p, { goodWhenUp: true, fmt: fmtDuration, unit: "time" }) + ` vs ${vs}` : (sum.t ? `${Math.round((sum.p / sum.t) * 100)}% of tracked` : "Nothing tracked"),
       }),
       summaryTile({
         label: "Daily average",
@@ -850,6 +902,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       recPeriod === "week" ? renderWeekBars(days, todayKey)
         : recPeriod === "month" ? renderMonthCalendar(days, todayKey)
         : renderContributionGrid(prog));
+
+    const shortDate = (d) => d.date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    const stat = (label, value, sub, cls = "") => `
+      <div class="stat">
+        <span class="stat-label">${label}</span>
+        <span class="stat-value ${cls}">${value}</span>
+        <span class="stat-sub">${sub}</span>
+      </div>`;
+    setHtml("recStats", [
+      stat("Most productive day", sum.mostProductive ? fmtDuration(sum.mostProductive.p) : "—", sum.mostProductive ? shortDate(sum.mostProductive) : "Nothing tracked", sum.mostProductive ? "is-accent" : ""),
+      stat("Best focus day", sum.bestFocus ? sum.bestFocus.f : "—", sum.bestFocus ? shortDate(sum.bestFocus) : "Needs a 30m day", sum.bestFocus ? scoreTier(sum.bestFocus.f) : ""),
+      stat("Longest day", sum.longest ? fmtDuration(sum.longest.t) : "—", sum.longest ? shortDate(sum.longest) : "Nothing tracked"),
+      stat("Times stopped", sum.gs, "by a rule"),
+      stat("Turned back", sum.r, "chose not to go in", sum.r ? "is-held" : ""),
+      stat("Rules broken", sum.v, sum.v ? "limits or pauses" : "none this period", sum.v ? "is-missed" : "is-held"),
+    ].join(""));
+
+    const target = prog.config.focusTarget;
+    const scored = days.filter((d) => d.f != null && d.t >= 30 * 60);
+    setText("recFocusMeta", scored.length ? `${scored.filter((d) => d.f >= target).length} of ${scored.length} days on target` : `Target ${target}`);
+    setHtml("recFocus", scored.length ? renderFocusBars(days, target, todayKey) : emptyState(
+      "No scored days yet",
+      "A day gets a focus score once 30 minutes are tracked."
+    ));
 
     setText("recSplitMeta", sum.t ? `${fmtDuration(sum.t)} in total` : "");
     setHtml("recSplit", renderPeriodSplit(sum) || emptyState(
