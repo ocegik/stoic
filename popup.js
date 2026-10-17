@@ -273,9 +273,11 @@ function renderToday(sites, today) {
   }
 
   if (focusValEl) {
+    // No tracked time is no score — calculateFocusScore's 100 would be a claim.
+    const tracked = browsing.totalSeconds > 0;
     const score = calculateFocusScore(sites, today);
-    focusValEl.textContent = `${score}`;
-    focusValEl.className = "today-val tabular " + (score >= 70 ? "is-held" : score >= 45 ? "is-partial" : "is-missed");
+    focusValEl.textContent = tracked ? `${score}` : "—";
+    focusValEl.className = "today-val tabular " + (!tracked ? "" : score >= 70 ? "is-held" : score >= 45 ? "is-partial" : "is-missed");
     if (focusLblEl) focusLblEl.textContent = "Focus score";
   }
 

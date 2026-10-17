@@ -47,6 +47,7 @@ const {
   limitMinutesForDate,
   getDomainDisplayName,
   wasSuspendedOn,
+  getCategoryBreakdown,
 } = commonApi;
 
 const {
@@ -342,6 +343,174 @@ function renderContributionGrid(state) {
   `;
 }
 
+// ---------- periods: week / month / year ----------
+//
+// The Record tab reads history from the settled DayRecords (state.days,
+// ~400 days) because per-site history only keeps six days. Two days have no
+// DayRecord yet and are filled from `sites` instead: today (live), and any
+// recent day that hasn't been settled — so the numbers never drop a day.
+
+const WEEKDAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function periodRange(kind, offset, todayKey) {
+  const today = dateFromKey(todayKey) || new Date();
+  if (kind === "week") {
+    const monday = addDays(today, -((today.getDay() + 6) % 7) + offset * 7);
+    return { start: monday, end: addDays(monday, 6) };
+  }
+  if (kind === "month") {
+    const start = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    return { start, end: new Date(start.getFullYear(), start.getMonth() + 1, 0) };
+  }
+  // year: the same trailing 53 weeks the contribution grid shows
+  const end = addDays(today, 6 - today.getDay());
+  return { start: addDays(end, -(GRID_COLUMNS * GRID_ROWS - 1)), end };
+}
+
+function liveDayFromSites(key, sites) {
+  const macros = getCategoryBreakdown(sites, key).macroBreakdown || [];
+  const sec = (name) => (macros.find((m) => m.macro === name) || {}).seconds || 0;
+  const p = sec("Productivity");
+  const g = sec("General");
+  const l = sec("Leisure");
+  const t = p + g + l;
+  return { t, p, g, l, f: t > 0 ? calculateFocusScore(sites, key) : null };
+}
+
+// One entry per calendar day in [start, end]. status: held | partial |
+// missed | none | future. `live` marks a day built from `sites`.
+function buildPeriodDays(state, sites, start, end) {
+  const byDate = new Map();
+  for (const day of state.days || []) byDate.set(day.d, day);
+  const todayKey = (state.today && state.today.date) || todayStr();
+  const out = [];
+
+  for (let date = new Date(start); date <= end; date = addDays(date, 1)) {
+    const key = dateKey(date);
+    if (key > todayKey) {
+      out.push({ key, date, status: "future", t: 0, p: 0, g: 0, l: 0, f: null });
+      continue;
+    }
+    const rec = key === todayKey ? null : byDate.get(key);
+    if (rec) {
+      const t = rec.t || 0;
+      const p = rec.p || 0;
+      const l = rec.l || 0;
+      const status = cellStatus(rec);
+      out.push({
+        key, date, t, p, l,
+        g: rec.g != null ? rec.g : Math.max(0, t - p - l),
+        f: t > 0 ? rec.f : null,
+        status: status === "absent" ? "none" : status,
+      });
+      continue;
+    }
+    const live = liveDayFromSites(key, sites);
+    let status = "none";
+    if (key === todayKey && live.t > 0) {
+      const c = buildLiveDayView(sites, state).conditions;
+      if (!c.absent) status = c.held ? "held" : (c.c1 || c.c2 || c.c3) ? "partial" : "missed";
+    }
+    out.push({ key, date, ...live, status, live: true });
+  }
+  return out;
+}
+
+// Totals for a set of days. Focus is computed from the period's totals with
+// the same formula as calculateFocusScore, so a period score is exactly what
+// one long day with that mix would score — not an average of averages.
+function summarizePeriod(days) {
+  const sum = { t: 0, p: 0, g: 0, l: 0, active: 0, held: 0, settled: 0 };
+  for (const d of days) {
+    if (d.status === "future") continue;
+    sum.t += d.t;
+    sum.p += d.p;
+    sum.g += d.g;
+    sum.l += d.l;
+    if (d.t > 0) sum.active++;
+    if (!d.live && d.status !== "none") {
+      sum.settled++;
+      if (d.status === "held") sum.held++;
+    }
+  }
+  sum.focus = sum.t > 0
+    ? Math.min(100, Math.max(0, Math.round((sum.p / sum.t) * 100 - (sum.l / sum.t) * 25)))
+    : null;
+  sum.dailyAvg = sum.active ? sum.t / sum.active : 0;
+  sum.leisureAvg = sum.active ? sum.l / sum.active : 0;
+  return sum;
+}
+
+function dayTitle(d) {
+  const label = d.date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  if (d.status === "future") return label;
+  if (d.t === 0) return `${label} · nothing tracked`;
+  const statusWord = { held: "held", partial: "partly held", missed: "missed", none: "not settled" }[d.status];
+  return [
+    `${label}${d.live ? " (so far)" : ""} · ${fmtDuration(d.t)}`,
+    `Productive ${fmtDuration(d.p)} · General ${fmtDuration(d.g)} · Leisure ${fmtDuration(d.l)}`,
+    `Focus ${d.f != null ? d.f : "—"} · ${statusWord}`,
+  ].join("\n");
+}
+
+const catSegs = (d, total) =>
+  [["p", "productivity"], ["g", "general"], ["l", "leisure"]]
+    .map(([k, cls]) => (d[k] > 0 ? `<span class="cat-seg cat-${cls}" style="flex-grow:${(d[k] / total).toFixed(4)}"></span>` : ""))
+    .join("");
+
+// Week: seven stacked bars (productive / general / leisure), each with the
+// day's verdict under it.
+function renderWeekBars(days, todayKey) {
+  const max = Math.max(1, ...days.map((d) => d.t));
+  const cols = days.map((d, i) => {
+    const h = d.t > 0 ? Math.max(4, Math.round((d.t / max) * 100)) : 0;
+    const cls = `wk-col wk-${d.status}${d.key === todayKey ? " is-today" : ""}`;
+    return `
+      <div class="${cls}" title="${dayTitle(d)}">
+        <span class="wk-val">${d.t > 0 ? fmtDuration(d.t) : ""}</span>
+        <div class="wk-track"><div class="wk-bar" style="height:${h}%">${catSegs(d, d.t || 1)}</div></div>
+        <span class="wk-day">${d.key === todayKey ? "Today" : WEEKDAY_ABBR[i]}</span>
+        <span class="wk-dot" aria-hidden="true"></span>
+      </div>`;
+  }).join("");
+  return `<div class="wk">${cols}</div>`;
+}
+
+// Month: a calendar. Each day's colour is its verdict; the strip at the
+// bottom of a cell is how its time split.
+function renderMonthCalendar(days, todayKey) {
+  const lead = (days[0].date.getDay() + 6) % 7;
+  const blanks = '<span class="cal-cell cal-blank"></span>'.repeat(lead);
+  const cells = days.map((d) => `
+    <div class="cal-cell cal-${d.status}${d.key === todayKey ? " is-today" : ""}" title="${dayTitle(d)}">
+      <span class="cal-num">${d.date.getDate()}</span>
+      <span class="cal-time">${d.t > 0 ? fmtDuration(d.t) : ""}</span>
+      ${d.t > 0 ? `<span class="cal-split">${catSegs(d, d.t)}</span>` : ""}
+    </div>`).join("");
+  const head = WEEKDAY_ABBR.map((w) => `<span class="cal-head">${w}</span>`).join("");
+  return `<div class="cal">${head}${blanks}${cells}</div>`;
+}
+
+// Where the period's time went, by category.
+function renderPeriodSplit(sum) {
+  if (sum.t === 0) return "";
+  const rows = [
+    ["productivity", "Productive", sum.p],
+    ["general", "General", sum.g],
+    ["leisure", "Leisure", sum.l],
+  ];
+  const bar = rows.map(([cls, , s]) => (s > 0 ? `<span class="cat-seg cat-${cls}" style="flex-grow:${(s / sum.t).toFixed(4)}"></span>` : "")).join("");
+  const list = rows.map(([cls, label, s]) => `
+    <div class="ps-row">
+      <span class="cat-dot cat-${cls}"></span>
+      <span class="ps-name">${label}</span>
+      <span class="ps-avg">${sum.active ? `${fmtDuration(s / sum.active)}/day` : ""}</span>
+      <span class="ps-time">${fmtDuration(s)}</span>
+      <span class="ps-pct">${Math.round((s / sum.t) * 100)}%</span>
+    </div>`).join("");
+  return `<div class="ps-bar">${bar}</div><div class="ps-list">${list}</div>`;
+}
+
 // ---------- renderRecords ----------
 
 const RECORD_FORMATTERS = {
@@ -503,6 +672,12 @@ const progressionUiApi = {
   renderAchievements,
   renderLifetime,
   renderPopupStrip,
+  periodRange,
+  buildPeriodDays,
+  summarizePeriod,
+  renderWeekBars,
+  renderMonthCalendar,
+  renderPeriodSplit,
 };
 
 if (typeof module !== "undefined" && module.exports) {

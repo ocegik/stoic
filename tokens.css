@@ -1,10 +1,6 @@
 /* ===== tokens.css — Stoic design tokens =====
 
-   Palette: "Limestone" (light) / "Basalt" (dark).
-
-   Every hue here is a mineral pigment — limestone, ink, verdigris, ochre,
-   iron oxide, bronze — rather than a screen primary. The Roman reference
-   lives in the pigments and in the typographic restraint, not in imagery.
+   Palette: cool white and blue (light) / deep navy (dark).
 
    Colour carries meaning and nothing else. There are exactly five roles:
 
@@ -75,53 +71,62 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --bg-deep: #F4F1EA;
-  --bg-panel: #FBF9F4;
-  --bg-raised: #EBE7DD;
-  --border: #D8D2C4;
-  --border-soft: #E6E1D6;
+  --bg-deep: #F4F7FB;
+  --bg-panel: #FFFFFF;
+  --bg-raised: #EEF2F8;
+  --bg-sunken: #E8EEF6;
+  --border: #D5DEEA;
+  --border-soft: #E4EAF2;
 
-  --text-primary: #1A1815;
-  --text-muted: #4A443C;
-  --text-faint: #8A8175;
-  --overlay: rgba(244, 241, 234, 0.94);
+  --text-primary: #0F172A;
+  --text-muted: #475569;
+  --text-faint: #7C8BA1;
+  --overlay: rgba(244, 247, 251, 0.94);
 
-  /* Ink. Primary actions are near-black on paper — never a colour. */
-  --accent: #26231D;
-  --accent-soft: #3A362E;
-  --accent-dim: rgba(38, 35, 29, 0.08);
-  --accent-ring: rgba(38, 35, 29, 0.22);
-  --accent-ink: #FBF9F4;
+  /* Blue — interactive duty. */
+  --accent: #2563EB;
+  --accent-soft: #1D4ED8;
+  --accent-dim: rgba(37, 99, 235, 0.10);
+  --accent-ring: rgba(37, 99, 235, 0.28);
+  --accent-ink: #FFFFFF;
 
-  --error: #8C4A38;
-  --error-border: #C79B8C;
+  --error: #DC2626;
+  --error-border: #FCA5A5;
 
   /* ---- the five meanings ---- */
-  --held: #55684C;
-  --held-soft: #445440;
-  --held-dim: rgba(85, 104, 76, 0.12);
-  --held-border: #A9B7A0;
+  --held: #16A34A;
+  --held-soft: #15803D;
+  --held-dim: rgba(22, 163, 74, 0.12);
+  --held-border: #86EFAC;
 
-  --partial: #A8792C;
-  --partial-soft: #8A6120;
-  --partial-dim: rgba(168, 121, 44, 0.12);
-  --partial-border: #D9C08C;
+  --partial: #D97706;
+  --partial-soft: #B45309;
+  --partial-dim: rgba(217, 119, 6, 0.12);
+  --partial-border: #FCD34D;
 
-  --missed: #8C4A38;
-  --missed-soft: #753C2D;
-  --missed-dim: rgba(140, 74, 56, 0.12);
-  --missed-border: #C79B8C;
+  --missed: #DC2626;
+  --missed-soft: #B91C1C;
+  --missed-dim: rgba(220, 38, 38, 0.10);
+  --missed-border: #FCA5A5;
 
-  --waived: #7C7668;
-  --waived-soft: #625D52;
-  --waived-dim: rgba(124, 118, 104, 0.12);
-  --waived-border: #BEB8AA;
+  --waived: #64748B;
+  --waived-soft: #475569;
+  --waived-dim: rgba(100, 116, 139, 0.12);
+  --waived-border: #CBD5E1;
 
   /* Progression only. If this appears outside progression, it is a bug. */
-  --earned: #A9793F;
-  --earned-soft: #8C6230;
-  --earned-dim: rgba(169, 121, 63, 0.12);
-  --earned-border: #D6BA92;
+  --earned: #7C3AED;
+  --earned-soft: #6D28D9;
+  --earned-dim: rgba(124, 58, 237, 0.10);
+  --earned-border: #C4B5FD;
+
+  /* ---- categories ---- */
+  --cat-productive: #3B82F6;
+  --cat-productive-dim: rgba(59, 130, 246, 0.12);
+  --cat-general: #94A3B8;
+  --cat-general-dim: rgba(148, 163, 184, 0.16);
+  --cat-leisure: #F59E0B;
+  --cat-leisure-dim: rgba(245, 158, 11, 0.14);
 }
 
 /* ===================== DARK — "Basalt" ===================== */
@@ -130,101 +135,116 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --bg-deep: #13120F;
-    --bg-panel: #1B1915;
-    --bg-raised: #24211B;
-    --border: #3A352C;
-    --border-soft: #2C2822;
+    --bg-deep: #0B1120;
+    --bg-panel: #111A2E;
+    --bg-raised: #18233A;
+    --bg-sunken: #0E1627;
+    --border: #26344F;
+    --border-soft: #1C2840;
 
-    --text-primary: #F2EEE5;
-    --text-muted: #B7AFA1;
-    --text-faint: #857D70;
-    --overlay: rgba(19, 18, 15, 0.94);
+    --text-primary: #E8EEF8;
+    --text-muted: #A5B3C9;
+    --text-faint: #6C7C96;
+    --overlay: rgba(11, 17, 32, 0.94);
 
-    /* Bone. Primary actions are light on stone. */
-    --accent: #EDE8DC;
-    --accent-soft: #D8D2C4;
-    --accent-dim: rgba(237, 232, 220, 0.10);
-    --accent-ring: rgba(237, 232, 220, 0.24);
-    --accent-ink: #13120F;
+    --accent: #60A5FA;
+    --accent-soft: #93C5FD;
+    --accent-dim: rgba(96, 165, 250, 0.14);
+    --accent-ring: rgba(96, 165, 250, 0.36);
+    --accent-ink: #0B1120;
 
-    --error: #C0705A;
-    --error-border: #6B3A2C;
+    --error: #F87171;
+    --error-border: #7F1D1D;
 
-    --held: #7E9670;
-    --held-soft: #96AC89;
-    --held-dim: rgba(126, 150, 112, 0.14);
-    --held-border: #4A5842;
+    --held: #4ADE80;
+    --held-soft: #86EFAC;
+    --held-dim: rgba(74, 222, 128, 0.14);
+    --held-border: #166534;
 
-    --partial: #C79A4E;
-    --partial-soft: #D9B478;
-    --partial-dim: rgba(199, 154, 78, 0.14);
-    --partial-border: #6E5A30;
+    --partial: #FBBF24;
+    --partial-soft: #FCD34D;
+    --partial-dim: rgba(251, 191, 36, 0.14);
+    --partial-border: #78350F;
 
-    --missed: #C0705A;
-    --missed-soft: #D18E7B;
-    --missed-dim: rgba(192, 112, 90, 0.14);
-    --missed-border: #6B3A2C;
+    --missed: #F87171;
+    --missed-soft: #FCA5A5;
+    --missed-dim: rgba(248, 113, 113, 0.14);
+    --missed-border: #7F1D1D;
 
-    --waived: #8F877A;
-    --waived-soft: #A8A093;
-    --waived-dim: rgba(143, 135, 122, 0.14);
-    --waived-border: #4C463D;
+    --waived: #94A3B8;
+    --waived-soft: #CBD5E1;
+    --waived-dim: rgba(148, 163, 184, 0.14);
+    --waived-border: #334155;
 
-    --earned: #C89A5C;
-    --earned-soft: #DAB27B;
-    --earned-dim: rgba(200, 154, 92, 0.14);
-    --earned-border: #6E5535;
+    --earned: #A78BFA;
+    --earned-soft: #C4B5FD;
+    --earned-dim: rgba(167, 139, 250, 0.16);
+    --earned-border: #4C1D95;
+
+    --cat-productive: #60A5FA;
+    --cat-productive-dim: rgba(96, 165, 250, 0.16);
+    --cat-general: #64748B;
+    --cat-general-dim: rgba(100, 116, 139, 0.20);
+    --cat-leisure: #FBBF24;
+    --cat-leisure-dim: rgba(251, 191, 36, 0.16);
   }
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --bg-deep: #13120F;
-  --bg-panel: #1B1915;
-  --bg-raised: #24211B;
-  --border: #3A352C;
-  --border-soft: #2C2822;
+  --bg-deep: #0B1120;
+  --bg-panel: #111A2E;
+  --bg-raised: #18233A;
+  --bg-sunken: #0E1627;
+  --border: #26344F;
+  --border-soft: #1C2840;
 
-  --text-primary: #F2EEE5;
-  --text-muted: #B7AFA1;
-  --text-faint: #857D70;
-  --overlay: rgba(19, 18, 15, 0.94);
+  --text-primary: #E8EEF8;
+  --text-muted: #A5B3C9;
+  --text-faint: #6C7C96;
+  --overlay: rgba(11, 17, 32, 0.94);
 
-  --accent: #EDE8DC;
-  --accent-soft: #D8D2C4;
-  --accent-dim: rgba(237, 232, 220, 0.10);
-  --accent-ring: rgba(237, 232, 220, 0.24);
-  --accent-ink: #13120F;
+  --accent: #60A5FA;
+  --accent-soft: #93C5FD;
+  --accent-dim: rgba(96, 165, 250, 0.14);
+  --accent-ring: rgba(96, 165, 250, 0.36);
+  --accent-ink: #0B1120;
 
-  --error: #C0705A;
-  --error-border: #6B3A2C;
+  --error: #F87171;
+  --error-border: #7F1D1D;
 
-  --held: #7E9670;
-  --held-soft: #96AC89;
-  --held-dim: rgba(126, 150, 112, 0.14);
-  --held-border: #4A5842;
+  --held: #4ADE80;
+  --held-soft: #86EFAC;
+  --held-dim: rgba(74, 222, 128, 0.14);
+  --held-border: #166534;
 
-  --partial: #C79A4E;
-  --partial-soft: #D9B478;
-  --partial-dim: rgba(199, 154, 78, 0.14);
-  --partial-border: #6E5A30;
+  --partial: #FBBF24;
+  --partial-soft: #FCD34D;
+  --partial-dim: rgba(251, 191, 36, 0.14);
+  --partial-border: #78350F;
 
-  --missed: #C0705A;
-  --missed-soft: #D18E7B;
-  --missed-dim: rgba(192, 112, 90, 0.14);
-  --missed-border: #6B3A2C;
+  --missed: #F87171;
+  --missed-soft: #FCA5A5;
+  --missed-dim: rgba(248, 113, 113, 0.14);
+  --missed-border: #7F1D1D;
 
-  --waived: #8F877A;
-  --waived-soft: #A8A093;
-  --waived-dim: rgba(143, 135, 122, 0.14);
-  --waived-border: #4C463D;
+  --waived: #94A3B8;
+  --waived-soft: #CBD5E1;
+  --waived-dim: rgba(148, 163, 184, 0.14);
+  --waived-border: #334155;
 
-  --earned: #C89A5C;
-  --earned-soft: #DAB27B;
-  --earned-dim: rgba(200, 154, 92, 0.14);
-  --earned-border: #6E5535;
+  --earned: #A78BFA;
+  --earned-soft: #C4B5FD;
+  --earned-dim: rgba(167, 139, 250, 0.16);
+  --earned-border: #4C1D95;
+
+  --cat-productive: #60A5FA;
+  --cat-productive-dim: rgba(96, 165, 250, 0.16);
+  --cat-general: #64748B;
+  --cat-general-dim: rgba(100, 116, 139, 0.20);
+  --cat-leisure: #FBBF24;
+  --cat-leisure-dim: rgba(251, 191, 36, 0.16);
 }
 
 /* ===================== theme-invariant primitives ===================== */
@@ -272,8 +292,8 @@
   /* Two elevations. On paper-toned surfaces a heavy shadow reads as dirt,
      so separation is a hairline first and a shadow only for things that
      genuinely float. */
-  --shadow-raised: 0 1px 2px rgba(26, 24, 21, 0.05);
-  --shadow-overlay: 0 16px 48px rgba(26, 24, 21, 0.22);
+  --shadow-raised: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --shadow-overlay: 0 16px 48px rgba(15, 23, 42, 0.18);
 
   --duration-fast: 120ms;
   --duration-base: 180ms;

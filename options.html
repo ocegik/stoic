@@ -42,6 +42,7 @@
         <div class="kpi">
           <span class="kpi-label">Tracked</span>
           <span class="kpi-value" id="optTodayTotal">—</span>
+          <div class="meter meter-split" id="optTodaySplit"></div>
           <span class="kpi-sub" id="optTodayVsAvg"></span>
         </div>
         <div class="kpi">
@@ -63,13 +64,19 @@
       </div>
 
       <div class="cols cols-wide-left">
-        <section class="panel">
-          <header class="panel-head">
-            <h2 class="panel-title">Where today went</h2>
-            <span class="panel-meta" id="optSitesCount"></span>
-          </header>
-          <div class="site-list" id="optTopWebsitesList"></div>
-        </section>
+        <div class="stack">
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">Where today went</h2>
+              <span class="panel-meta" id="optSitesCount"></span>
+            </header>
+            <div class="site-list" id="optTopWebsitesList"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head"><h2 class="panel-title">How today split</h2></header>
+            <div class="split" id="optCategoryGrid"></div>
+          </section>
+        </div>
 
         <div class="stack">
           <section class="panel">
@@ -85,6 +92,16 @@
           </section>
         </div>
       </div>
+
+      <details class="panel disclosure-panel">
+        <summary class="panel-head">
+          <span>
+            <span class="panel-title">Every site today</span>
+            <span class="panel-meta">Change a category here and today's numbers update.</span>
+          </span>
+        </summary>
+        <div id="optDomainAuditTable" class="table-wrapper"></div>
+      </details>
     </section>
 
     <!-- ============ RECORD ============ -->
@@ -92,65 +109,65 @@
       <div class="page-head">
         <div>
           <h1 class="page-title">Your record</h1>
-          <p class="page-sub" id="optInsightText"></p>
+          <p class="page-sub verdict" id="recVerdict"></p>
+        </div>
+        <div class="segmented period-seg" id="recPeriodSeg" role="group" aria-label="Period">
+          <button class="seg-btn active" type="button" data-value="week">Week</button>
+          <button class="seg-btn" type="button" data-value="month">Month</button>
+          <button class="seg-btn" type="button" data-value="year">Year</button>
         </div>
       </div>
 
       <div id="progLevelUpBannerOptions" class="banner-slot"></div>
 
-      <section class="panel">
-        <div id="progIdentityContainer"></div>
-      </section>
+      <div class="period-nav">
+        <button class="icon-btn" type="button" id="recPrevBtn" aria-label="Previous period">&#8249;</button>
+        <span class="period-label" id="recPeriodLabel" aria-live="polite"></span>
+        <button class="icon-btn" type="button" id="recNextBtn" aria-label="Next period">&#8250;</button>
+      </div>
+
+      <div class="kpis" id="recSummary"></div>
 
       <section class="panel">
         <header class="panel-head">
-          <h2 class="panel-title">The year, day by day</h2>
-          <span class="panel-meta">A day is held when every rule held, leisure stayed under the ceiling and focus met the target.</span>
+          <h2 class="panel-title" id="recChartTitle">Day by day</h2>
+          <span class="legend" id="recLegend">
+            <span class="legend-item"><span class="cat-dot cat-productivity"></span>Productive</span>
+            <span class="legend-item"><span class="cat-dot cat-general"></span>General</span>
+            <span class="legend-item"><span class="cat-dot cat-leisure"></span>Leisure</span>
+            <span class="legend-sep" aria-hidden="true"></span>
+            <span class="legend-item"><span class="v-dot v-held"></span>Held</span>
+            <span class="legend-item"><span class="v-dot v-partial"></span>Partly</span>
+            <span class="legend-item"><span class="v-dot v-missed"></span>Missed</span>
+          </span>
         </header>
-        <div id="progGridContainer"></div>
+        <div id="recChart"></div>
+        <p class="panel-foot">A day is held when every rule held, leisure stayed under the ceiling and focus met the target. Hover a day for its full breakdown.</p>
       </section>
-
-      <div class="cols">
-        <section class="panel">
-          <header class="panel-head"><h2 class="panel-title">Streaks</h2></header>
-          <div id="progStreaksContainer"></div>
-        </section>
-        <section class="panel">
-          <header class="panel-head"><h2 class="panel-title">Personal records</h2></header>
-          <div id="progRecordsContainer"></div>
-        </section>
-      </div>
 
       <div class="cols">
         <section class="panel">
           <header class="panel-head">
-            <h2 class="panel-title">Last seven days</h2>
-            <span class="panel-meta" id="optWeekTotal"></span>
+            <h2 class="panel-title">Where the time went</h2>
+            <span class="panel-meta" id="recSplitMeta"></span>
           </header>
-          <div class="week-chart" id="optAnalyticsChart"></div>
+          <div id="recSplit"></div>
         </section>
         <section class="panel">
-          <header class="panel-head"><h2 class="panel-title">How today split</h2></header>
-          <div class="split" id="optCategoryGrid"></div>
+          <div id="progIdentityContainer"></div>
+          <hr class="hairline panel-rule" />
+          <div id="progStreaksContainer"></div>
         </section>
       </div>
 
-      <section class="panel">
-        <header class="panel-head">
-          <h2 class="panel-title">Every site today</h2>
-          <span class="panel-meta">Change a category here and today's numbers update.</span>
-        </header>
-        <div id="optDomainAuditTable" class="table-wrapper"></div>
-      </section>
-
-      <section class="panel">
-        <div id="progAchievementsContainer"></div>
-      </section>
-
-      <section class="panel">
-        <header class="panel-head"><h2 class="panel-title">Lifetime</h2></header>
+      <details class="panel disclosure-panel" id="recMore">
+        <summary class="panel-head"><span class="panel-title">Records, achievements and lifetime totals</span></summary>
+        <h3 class="sub-title">Personal records</h3>
+        <div id="progRecordsContainer"></div>
+        <div id="progAchievementsContainer" class="mt-5"></div>
+        <h3 class="sub-title">Lifetime</h3>
         <div id="progLifetimeContainer"></div>
-      </section>
+      </details>
     </section>
 
     <!-- ============ RULES ============ -->

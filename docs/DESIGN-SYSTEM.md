@@ -1,5 +1,13 @@
 # Stoic — Design System
 
+> **2026-10-18 — palette superseded.** The client rejected the warm mineral
+> palette (Limestone / Verdigris / bronze) as too warm. `tokens.css` now holds a
+> cool white + blue palette (deep navy in dark): blue accent, green/amber/red
+> for held/partial/missed, violet for progression (`--earned`), and
+> blue/slate/amber for Productive/General/Leisure. Token *names* and the
+> "where each colour is allowed" rules below still apply; the hex values in
+> Part 2 do not. The Record tab is now Week / Month / Year with prev/next.
+
 Date adopted: 2026-07-31
 Status: **binding for Phase 3**. This document is the spec Phase 3 executes.
 No new design decisions belong in Phase 3 — if something here is ambiguous, ask.

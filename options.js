@@ -97,7 +97,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optImportNote = document.getElementById("optImportNote");
   const optResetAllBtn = document.getElementById("optResetAllBtn");
 
-  const optAnalyticsChart = document.getElementById("optAnalyticsChart");
   const optCategoryGrid = document.getElementById("optCategoryGrid");
   const optDomainAuditTable = document.getElementById("optDomainAuditTable");
 
@@ -107,7 +106,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const progIdentityContainer = document.getElementById("progIdentityContainer");
   const progStandingContainer = document.getElementById("progStandingContainer");
   const progStreaksContainer = document.getElementById("progStreaksContainer");
-  const progGridContainer = document.getElementById("progGridContainer");
   const progRecordsContainer = document.getElementById("progRecordsContainer");
   const progAchievementsContainer = document.getElementById("progAchievementsContainer");
   const progLifetimeContainer = document.getElementById("progLifetimeContainer");
@@ -373,6 +371,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireSegmented(optModalActionSeg, (val) => setModalAction(val));
 
+  // Record tab: which period is showing, and how far back.
+  let recPeriod = "week";
+  let recOffset = 0;
+  const recPrevBtn = document.getElementById("recPrevBtn");
+  const recNextBtn = document.getElementById("recNextBtn");
+  wireSegmented(document.getElementById("recPeriodSeg"), (val) => {
+    recPeriod = val;
+    recOffset = 0;
+    if (progState) renderRecord(progState);
+  });
+  recPrevBtn?.addEventListener("click", () => { recOffset--; if (progState) renderRecord(progState); });
+  recNextBtn?.addEventListener("click", () => { recOffset = Math.min(0, recOffset + 1); if (progState) renderRecord(progState); });
+
   if (siteSearchInput) {
     siteSearchInput.addEventListener("input", (e) => {
       searchQuery = e.target.value.trim().toLowerCase();
@@ -456,7 +467,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!optOverviewRefusals) return;
     try {
       const prog = await loadProgression();
-      optOverviewRefusals.textContent = (prog.lifetime && prog.lifetime.refusals) || 0;
+      const refusals = (prog.lifetime && prog.lifetime.refusals) || 0;
+      optOverviewRefusals.textContent = refusals;
+      optOverviewRefusals.classList.toggle("is-held", refusals > 0);
     } catch {
       optOverviewRefusals.textContent = "—";
     }
@@ -583,16 +596,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         : "Mostly leisure time";
     }
 
-    if (optOverviewTrippedCount) optOverviewTrippedCount.textContent = moderation.limitsTriggeredToday;
-    renderLifetimeRefusals();
+    const splitEl = document.getElementById("optTodaySplit");
+    if (splitEl) {
+      const macros = (browsing.categoryBreakdown && browsing.categoryBreakdown.macroBreakdown) || [];
+      splitEl.innerHTML = macros
+        .filter((m) => m.seconds > 0)
+        .map((m) => `<span class="cat-seg ${catClass(m.macro)}" style="flex-grow:${m.seconds}" title="${esc(MACRO_CATEGORIES[m.macro]?.label || m.macro)} ${m.pctOfTotal}%"></span>`)
+        .join("");
+    }
 
-    const optInsightText = document.getElementById("optInsightText");
-    if (optInsightText) optInsightText.textContent = generateQuickInsight(sites, today);
+    if (optOverviewTrippedCount) {
+      optOverviewTrippedCount.textContent = moderation.limitsTriggeredToday;
+      optOverviewTrippedCount.classList.toggle("is-missed", moderation.limitsTriggeredToday > 0);
+    }
+    renderLifetimeRefusals();
 
     renderOverviewTopWebsites(browsing.topWebsites);
     renderRulesNow();
     renderSyncSection();
-    renderAnalytics(browsing, totals);
+    renderAnalytics(browsing);
     renderDisciplines();
     renderChannelsTable();
     renderProgress().catch((err) => console.error("[Stoic] progress tab render failed", err));
@@ -610,7 +632,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (progIdentityContainer) progIdentityContainer.innerHTML = renderLevelIdentity(prog);
     if (progStandingContainer) progStandingContainer.innerHTML = renderTodayStanding(buildLiveDayView(sites, prog));
     if (progStreaksContainer) progStreaksContainer.innerHTML = renderStreaks(prog);
-    if (progGridContainer) progGridContainer.innerHTML = renderContributionGrid(prog);
+    renderRecord(prog);
     if (progRecordsContainer) progRecordsContainer.innerHTML = renderRecords(prog);
     if (progAchievementsContainer) {
       const wasOpen = !!progAchievementsContainer.querySelector("details[open]");
@@ -716,30 +738,124 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (optSyncToggle) optSyncToggle.checked = storagePref === "sync";
   }
 
-  function renderAnalytics(browsing, totals) {
-    if (optAnalyticsChart) {
-      const maxSec = Math.max(1, ...totals.map((d) => d.seconds));
-      const weekTotal = totals.reduce((sum, d) => sum + d.seconds, 0);
-      const weekTotalEl = document.getElementById("optWeekTotal");
-      if (weekTotalEl) weekTotalEl.textContent = weekTotal ? `${fmtDuration(weekTotal)} in total` : "";
-
-      if (weekTotal === 0) {
-        optAnalyticsChart.innerHTML = emptyState("No week to show yet", "After a day or two of tracking, the last seven days appear here.");
-      } else {
-        optAnalyticsChart.innerHTML = totals.map((day) => {
-          const h = day.seconds > 0 ? Math.max(3, Math.round((day.seconds / maxSec) * 100)) : 0;
-          return `
-            <div class="week-col${day.isToday ? " is-today" : ""}" title="${day.key}">
-              <span class="week-val">${day.seconds > 0 ? fmtDuration(day.seconds) : ""}</span>
-              <div class="week-bar" style="height:${h}%"></div>
-              <span class="week-label">${day.isToday ? "Today" : day.label}</span>
-            </div>`;
-        }).join("");
-      }
-    }
-
+  function renderAnalytics(browsing) {
     renderCategoryGrid(browsing.categoryBreakdown);
     renderAuditTable(browsing);
+  }
+
+  // ---------- Record tab ----------
+  // Surface: four numbers and one picture of the period. Everything else
+  // (hover breakdowns, records, achievements, lifetime) sits one step down.
+
+  function periodLabel(kind, start, end, offset) {
+    if (kind === "year") return "The last twelve months";
+    if (kind === "month") {
+      const name = start.toLocaleDateString([], { month: "long", year: "numeric" });
+      return offset === 0 ? `This month · ${name}` : name;
+    }
+    const fmt = (d) => d.toLocaleDateString([], { month: "short", day: "numeric" });
+    const range = `${fmt(start)} – ${fmt(end)}`;
+    return offset === 0 ? `This week · ${range}` : offset === -1 ? `Last week · ${range}` : range;
+  }
+
+  // A change against the previous period. `goodWhenUp` decides the colour;
+  // the arrow only ever says which way it moved.
+  function delta(curr, prev, { goodWhenUp, fmt, unit }) {
+    if (curr == null || prev == null || !prev) return "";
+    const diff = curr - prev;
+    if (Math.abs(diff) < (unit === "time" ? 60 : 1)) return `<span class="delta">Same as before</span>`;
+    const good = goodWhenUp ? diff > 0 : diff < 0;
+    return `<span class="delta ${good ? "is-good" : "is-bad"}">${diff > 0 ? "↑" : "↓"} ${fmt(Math.abs(diff))}</span>`;
+  }
+
+  function summaryTile({ label, value, cls = "", sub = "", meter = null }) {
+    return `
+      <div class="kpi">
+        <span class="kpi-label">${label}</span>
+        <span class="kpi-value ${cls}">${value}</span>
+        ${meter != null ? `<div class="meter"><div class="meter-fill ${cls}" style="width:${meter}%"></div></div>` : ""}
+        <span class="kpi-sub">${sub}</span>
+      </div>`;
+  }
+
+  function verdictSentence(kind, sum, offset) {
+    const span = kind === "week" ? "week" : kind === "month" ? "month" : "year";
+    const when = offset === 0 ? `this ${span}` : `that ${span}`;
+    if (sum.t === 0) {
+      return offset === 0
+        ? `Nothing recorded ${when} yet. Every day you browse is written here, held or not.`
+        : `Nothing was recorded ${when}.`;
+    }
+    if (sum.settled === 0) return `${fmtDuration(sum.t)} tracked ${when}. Today is still being written.`;
+    if (sum.held === sum.settled) return `Every finished day ${when} was held. ${sum.held} of ${sum.settled}.`;
+    if (sum.held === 0) return `No day held ${when} yet. The next one counts the same as any other.`;
+    return `${sum.held} of ${sum.settled} finished days held ${when}.`;
+  }
+
+  function renderRecord(prog) {
+    const todayKey = (prog.today && prog.today.date) || todayStr();
+    const { start, end } = periodRange(recPeriod, recOffset, todayKey);
+    const days = buildPeriodDays(prog, sites, start, end);
+    const sum = summarizePeriod(days);
+    const prevRange = recPeriod === "year" ? null : periodRange(recPeriod, recOffset - 1, todayKey);
+    const prev = prevRange ? summarizePeriod(buildPeriodDays(prog, sites, prevRange.start, prevRange.end)) : null;
+
+    const setHtml = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+
+    setText("recPeriodLabel", periodLabel(recPeriod, start, end, recOffset));
+    setText("recVerdict", verdictSentence(recPeriod, sum, recOffset));
+    if (recPrevBtn) recPrevBtn.hidden = recPeriod === "year";
+    if (recNextBtn) { recNextBtn.hidden = recPeriod === "year"; recNextBtn.disabled = recOffset >= 0; }
+
+    const vs = recPeriod === "week" ? "last week" : "last month";
+    const pts = (n) => `${Math.round(n)} pts`;
+    const heldPct = sum.settled ? Math.round((sum.held / sum.settled) * 100) : null;
+    setHtml("recSummary", [
+      summaryTile({
+        label: "Days held",
+        value: sum.settled ? `${sum.held}<small>/${sum.settled}</small>` : "—",
+        cls: heldPct == null ? "" : heldPct >= 70 ? "is-held" : heldPct >= 40 ? "is-partial" : "is-missed",
+        meter: heldPct,
+        sub: sum.settled ? `${heldPct}% of finished days` : "No finished days yet",
+      }),
+      summaryTile({
+        label: "Focus score",
+        value: sum.focus == null ? "—" : sum.focus,
+        cls: sum.focus == null ? "" : scoreTier(sum.focus),
+        meter: sum.focus,
+        sub: prev ? delta(sum.focus, prev.focus, { goodWhenUp: true, fmt: pts }) + (prev.focus != null && sum.focus != null ? ` vs ${vs}` : "") : "Whole period, by time",
+      }),
+      summaryTile({
+        label: "Daily average",
+        value: sum.active ? fmtDuration(sum.dailyAvg) : "—",
+        sub: sum.active
+          ? `${fmtDuration(sum.t)} over ${sum.active} day${sum.active === 1 ? "" : "s"}`
+          : "Nothing tracked",
+      }),
+      summaryTile({
+        label: "Leisure a day",
+        value: sum.active ? fmtDuration(sum.leisureAvg) : "—",
+        cls: sum.active ? (sum.leisureAvg <= prog.config.leisureCeilingMinutes * 60 ? "is-held" : "is-missed") : "",
+        sub: sum.active
+          ? (prev && prev.active ? delta(sum.leisureAvg, prev.leisureAvg, { goodWhenUp: false, fmt: fmtDuration, unit: "time" }) + ` vs ${vs}` : `Ceiling ${prog.config.leisureCeilingMinutes}m`)
+          : `Ceiling ${prog.config.leisureCeilingMinutes}m`,
+      }),
+    ].join(""));
+
+    const legend = document.getElementById("recLegend");
+    if (legend) legend.hidden = recPeriod === "year"; // the grid carries its own
+    setText("recChartTitle", recPeriod === "week" ? "Day by day" : recPeriod === "month" ? "The month at a glance" : "The year, day by day");
+    setHtml("recChart",
+      recPeriod === "week" ? renderWeekBars(days, todayKey)
+        : recPeriod === "month" ? renderMonthCalendar(days, todayKey)
+        : renderContributionGrid(prog));
+
+    setText("recSplitMeta", sum.t ? `${fmtDuration(sum.t)} in total` : "");
+    setHtml("recSplit", renderPeriodSplit(sum) || emptyState(
+      "Nothing to split yet",
+      "Once time is tracked in this period, it shows how it divided between productive, general and leisure."
+    ));
   }
 
   function renderCategoryGrid(categoryBreakdown) {

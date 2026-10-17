@@ -15,7 +15,7 @@
 }
 .prog-ring { position: relative; width: 56px; height: 56px; }
 .prog-ring-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.prog-ring-bg { fill: none; stroke: var(--border-soft); stroke-width: 6; }
+.prog-ring-bg { fill: none; stroke: var(--bg-sunken); stroke-width: 6; }
 .prog-ring-fill { fill: none; stroke: var(--earned); stroke-width: 6; stroke-linecap: round; }
 .prog-ring-label {
   position: absolute; inset: 0;
@@ -27,7 +27,7 @@
 .prog-rank-name { font-size: var(--text-lg); font-weight: 600; }
 .prog-rank-descriptor { font-family: var(--serif); font-size: var(--text-md); color: var(--text-muted); margin-top: 2px; }
 .prog-identity-xp { display: flex; flex-direction: column; gap: 6px; }
-.prog-xp-bar { height: 6px; border-radius: 3px; background: var(--border-soft); overflow: hidden; }
+.prog-xp-bar { height: 6px; border-radius: 3px; background: var(--bg-sunken); overflow: hidden; }
 .prog-xp-bar-fill { height: 100%; background: var(--earned); }
 .prog-xp-note { font-family: var(--mono); font-size: var(--text-xs); color: var(--text-faint); text-align: right; }
 
@@ -113,13 +113,13 @@
   grid-template-rows: repeat(7, auto);
   gap: 3px;
 }
-.prog-cell { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--border-soft); }
+.prog-cell { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--bg-sunken); }
 .prog-grid-legend .prog-cell { width: 10px; height: 10px; }
 .prog-cell-held { background: var(--held); }
 .prog-cell-partial { background: var(--partial); }
-.prog-cell-missed { background: var(--missed-border); }
-.prog-cell-absent { background: var(--border-soft); }
-.prog-cell-today { box-shadow: 0 0 0 1.5px var(--text-primary); }
+.prog-cell-missed { background: var(--missed); opacity: 0.55; }
+.prog-cell-absent { background: var(--bg-sunken); }
+.prog-cell-today { box-shadow: 0 0 0 1.5px var(--accent); }
 .prog-grid-legend {
   display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap;
   gap: var(--space-4); margin-top: var(--space-2);
@@ -171,7 +171,7 @@
 .prog-achievement-locked .prog-achievement-name { color: var(--text-muted); }
 .prog-achievement-criterion { font-size: var(--text-sm); color: var(--text-muted); line-height: var(--leading-normal); }
 .prog-achievement-meta { font-family: var(--mono); font-size: var(--text-xs); color: var(--text-faint); }
-.prog-achievement-progress { height: 4px; border-radius: 2px; background: var(--border-soft); overflow: hidden; margin-top: 4px; }
+.prog-achievement-progress { height: 4px; border-radius: 2px; background: var(--bg-sunken); overflow: hidden; margin-top: 4px; }
 .prog-achievement-progress-fill { height: 100%; background: var(--earned); }
 
 /* ---- lifetime: definition list ---- */
