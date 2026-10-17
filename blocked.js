@@ -41,18 +41,48 @@ function equivalencyFor(weeklyMinutes) {
   }
 }
 
-function msUntilMidnight() {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  return midnight - now;
+function escapeHtml(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
 }
 
-function renderResetNote() {
-  const ms = msUntilMidnight();
+function fmtUntil(ms) {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
-  document.getElementById("resetNote").textContent = `Resets in ${h}h ${m}m`;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// When will this site open again, in words? Only says something that is
+// actually true for this rule: an always-closed site with no schedule never
+// "resets", so it gets no line at all.
+function reopenText(entry, reason) {
+  if (reason === "restraint") return "";
+  const now = new Date();
+  const schedule = normalizeSchedule(entry.schedule);
+  const end = timeStringToMinutes(schedule.endTime);
+  if (end !== null && isWithinTimeWindow(entry, now)) {
+    const at = new Date(now);
+    at.setHours(Math.floor(end / 60), end % 60, 0, 0);
+    if (at <= now) at.setDate(at.getDate() + 1);
+    return `Opens again at ${schedule.endTime} · in ${fmtUntil(at - now)}`;
+  }
+  if (reason === "limit") {
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    return `A new day's minutes start at midnight · in ${fmtUntil(midnight - now)}`;
+  }
+  for (let i = 1; i <= 7; i++) {
+    const day = addDays(now, i);
+    if (!isScheduleDay(entry, day)) return `Opens again on ${day.toLocaleDateString([], { weekday: "long" })}`;
+  }
+  return "";
+}
+
+function renderFacts(facts) {
+  document.getElementById("statRow").innerHTML = facts
+    .map((f) => `<div class="bp-fact${f.good ? " is-good" : ""}"><dd>${f.value}</dd><dt>${f.label}</dt></div>`)
+    .join("");
 }
 
 // Picks a random quote, excluding whichever index was shown last time, so
@@ -97,251 +127,230 @@ async function turnedBackCountFor(domain) {
 }
 
 async function main() {
-  const themePref = await getThemePreference();
-  applyTheme(themePref);
+  applyTheme(await getThemePreference());
 
   const sites = await getSites();
   const entry = sites[site] || {};
+  const displayName = getDomainDisplayName(site);
 
   const headline = document.getElementById("headline");
   const subhead = document.getElementById("subhead");
-  const eyebrowStatus = document.getElementById("eyebrowStatus");
-  const statRow = document.getElementById("statRow");
-  const placardText = document.getElementById("placardText");
-  const equivalency = document.getElementById("equivalency");
+  const eyebrow = document.getElementById("eyebrowStatus");
+  const context = document.getElementById("equivalency");
 
-  placardText.textContent = await pickQuote();
+  document.getElementById("placardText").textContent = await pickQuote();
 
   const today = todayStr();
-  const todaySeconds = entry.lastReset === today ? entry.usedSeconds || 0 : 0;
-  const todayMinutes = todaySeconds / 60;
+  const todaySeconds = usageSecondsForDate(entry, today, today);
+  const weekSeconds = trailingWeekUsage(entry).reduce((sum, d) => sum + d.seconds, 0);
+  const tripsToday = tripsForDate(entry, today, today);
   const activeRule = getActiveRule(entry);
-  const limitMinutes = activeRule.limitMinutes || entry.limitMinutes || "?";
-
-  const weeklySeconds =
-    todaySeconds + (entry.history || []).reduce((sum, h) => sum + (h.seconds || 0), 0);
-  const weeklyMinutes = weeklySeconds / 60;
-  const timesTripped = entry.timesTripped || 0;
+  const limitMinutes = activeRule.limitMinutes || entry.limitMinutes || 0;
+  const siteHtml = `<span class="site">${escapeHtml(displayName)}</span>`;
+  const stoppedToday = { value: tripsToday, label: tripsToday === 1 ? "Time stopped here today" : "Times stopped here today" };
 
   if (reason === "limit") {
-    // The eyebrow states what happened. It does not deliver a verdict: the
-    // user is on this page precisely because the limit ran out, and
-    // congratulating them at that moment is a semantic inversion.
-    eyebrowStatus.textContent = "DAILY LIMIT REACHED";
-    eyebrowStatus.className = "eyebrow-status is-partial";
+    eyebrow.textContent = "Daily limit reached";
+    eyebrow.className = "bp-eyebrow is-partial";
     headline.textContent = "Today's limit is spent";
-    subhead.innerHTML = `You set <span class="site">${site}</span> to ${limitMinutes} minutes a day. That was all of it.`;
-    statRow.innerHTML = `
-      <div class="stat-cell"><div class="stat-value">${fmtMinutes(todayMinutes)}</div><div class="stat-label">Today</div></div>
-      <div class="stat-cell"><div class="stat-value">${fmtMinutes(weeklyMinutes)}</div><div class="stat-label">This week</div></div>
-      <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times stopped here</div></div>
-    `;
-    equivalency.textContent = equivalencyFor(weeklyMinutes);
+    subhead.innerHTML = `You gave ${siteHtml} ${limitMinutes} minutes a day. That was all of them.`;
+    renderFacts([
+      { value: fmtDuration(todaySeconds), label: "Today" },
+      { value: fmtDuration(weekSeconds), label: "Last 7 days" },
+      stoppedToday,
+    ]);
+    context.textContent = equivalencyFor(weekSeconds / 60);
   } else if (reason === "restraint") {
     const targetUrl = params.get("targetUrl") || `https://${site}`;
-    const displayName = getDomainDisplayName(site);
-
-    eyebrowStatus.textContent = "PAUSE BEFORE OPENING";
-    eyebrowStatus.className = "eyebrow-status";
+    eyebrow.textContent = "Pause before opening";
+    eyebrow.className = "bp-eyebrow is-waived";
     headline.textContent = "You asked to be stopped here.";
-    subhead.innerHTML = `A minute from now, <span class="site">${displayName}</span> will feel less urgent than it does right now. If it still matters then, the way through is below.`;
+    subhead.innerHTML = `A minute from now, ${siteHtml} will feel less urgent than it does right now. If it still matters then, the way through is below.`;
     const turnedBack = await turnedBackCountFor(site);
-    statRow.innerHTML = `
-      <div class="stat-cell"><div class="stat-value">${turnedBack}</div><div class="stat-label">Turned back from here</div></div>
-      <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times paused</div></div>
-    `;
-    equivalency.textContent = "The pause isn't here to be convenient. It's here so the next minute is decided on purpose rather than on impulse.";
-
+    renderFacts([
+      { value: turnedBack, label: "Turned back from here", good: turnedBack > 0 },
+      { value: fmtDuration(todaySeconds), label: "Spent here today" },
+      stoppedToday,
+    ]);
     setupRestraintChallenge(site, targetUrl);
   } else {
-    eyebrowStatus.textContent = "ALWAYS CLOSED";
-    eyebrowStatus.className = "eyebrow-status is-missed";
+    eyebrow.textContent = "Always closed";
+    eyebrow.className = "bp-eyebrow is-missed";
     headline.textContent = "This one stays closed";
-    subhead.innerHTML = `You set <span class="site">${site}</span> to stay closed. There is no way through it from here.`;
-    statRow.innerHTML = `
-      <div class="stat-cell"><div class="stat-value">${timesTripped}</div><div class="stat-label">Times you've reached for it</div></div>
-    `;
-    equivalency.textContent =
-      timesTripped > 5
-        ? "Reaching for it is a habit. Not opening it is how the habit thins out."
-        : "Every time this doesn't open, the habit gets a little weaker.";
+    subhead.innerHTML = `You set ${siteHtml} to stay closed. There is no way through from here.`;
+    renderFacts([
+      stoppedToday,
+      { value: entry.timesTripped || 0, label: "Times reached for, all time" },
+    ]);
+    context.textContent = tripsToday > 3
+      ? "Reaching for it is a habit. Not opening it is how the habit thins out."
+      : "";
   }
 
-  renderResetNote();
-  setInterval(renderResetNote, 60000);
+  const renderReopen = () => { document.getElementById("resetNote").textContent = reopenText(entry, reason); };
+  renderReopen();
+  setInterval(renderReopen, 30000);
 }
 
-// Restraint Mode is now a single fixed-difficulty gate: a mandatory 60s
-// wait, two hard puzzles solved back to back, and a genuinely written
-// reason — all three running concurrently, all three required before
-// Continue unlocks. There is no easier configuration to pick.
+// The pause: a mandatory 60s wait, two hard problems back to back, and a
+// genuinely written reason — all running concurrently, all required before
+// Continue unlocks. The only choice offered is how long the site stays open
+// afterwards, and the shortest is the default.
+const PASS_OPTIONS = [5, 15, 30];
+
 function setupRestraintChallenge(site, destUrl) {
-  const restraintBox = document.getElementById("restraintBox");
-  const restraintBadge = document.getElementById("restraintBadge");
-  const restraintWidget = document.getElementById("restraintWidget");
+  const box = document.getElementById("restraintBox");
+  const steps = document.getElementById("restraintWidget");
   const continueBtn = document.getElementById("continueBtn");
-  const closeBtn = document.getElementById("closeBtn");
-
-  if (!restraintBox || !restraintWidget || !continueBtn) return;
-
-  restraintBox.style.display = "flex";
-  continueBtn.style.display = "inline-flex";
-  continueBtn.disabled = true;
-  continueBtn.textContent = "Complete the steps below";
-  if (closeBtn) closeBtn.textContent = "Go back";
-  if (restraintBadge) restraintBadge.textContent = "THE PAUSE";
-
+  const gateCount = document.getElementById("gateCount");
+  const passSeg = document.getElementById("passSeg");
   const displayName = getDomainDisplayName(site);
-  const randomQ = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
+  const question = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
+  let passMinutes = PASS_OPTIONS[0];
 
-  restraintWidget.innerHTML = `
-    <div class="gate-step" id="gateTimerStep">
-      <div class="gate-step-label">1 · Wait it out — cannot be skipped</div>
-      <div class="countdown-timer-wrap">
-        <svg viewBox="0 0 90 90" class="countdown-svg">
-          <circle cx="45" cy="45" r="40" class="countdown-ring-bg" />
-          <circle cx="45" cy="45" r="40" class="countdown-ring-fill" id="countdownRing" />
-        </svg>
-        <span class="countdown-number" id="countdownVal">${RESTRAINT_WAIT_SECONDS}</span>
+  box.hidden = false;
+  continueBtn.hidden = false;
+
+  steps.innerHTML = `
+    <li class="bp-step" id="stepWait">
+      <span class="bp-step-mark">1</span>
+      <div>
+        <p class="bp-step-title">Wait sixty seconds</p>
+        <div class="bp-wait">
+          <div class="bp-wait-track"><div class="bp-wait-fill" id="waitFill"></div></div>
+          <span class="bp-wait-val" id="waitVal">${RESTRAINT_WAIT_SECONDS}s</span>
+        </div>
       </div>
-    </div>
-
-    <div class="gate-step" id="gatePuzzleStep">
-      <div class="gate-step-label">2 · Solve ${RESTRAINT_PUZZLE_STREAK_REQUIRED} in a row</div>
-      <div class="math-puzzle-box">
-        <div class="math-question" id="puzzleQuestion"></div>
-        <input type="number" class="math-input" id="puzzleInput" placeholder="?" autofocus />
-        <div class="gate-puzzle-progress" id="puzzleProgress"></div>
-        <div class="field-error" id="puzzleErr" style="display:none;">Incorrect. Streak reset — new problem:</div>
-        <button type="button" class="btn-ghost" id="puzzleSubmitBtn" style="padding: 8px 16px;">Check Answer</button>
+    </li>
+    <li class="bp-step" id="stepPuzzle">
+      <span class="bp-step-mark">2</span>
+      <div>
+        <p class="bp-step-title">Solve ${RESTRAINT_PUZZLE_STREAK_REQUIRED} in a row</p>
+        <div class="bp-puzzle">
+          <span class="bp-puzzle-q" id="puzzleQuestion"></span>
+          <input type="number" class="field" id="puzzleInput" placeholder="Answer" aria-label="Answer" />
+          <button type="button" class="btn-ghost" id="puzzleSubmitBtn">Check</button>
+          <span class="bp-puzzle-dots" id="puzzleProgress"></span>
+        </div>
+        <div class="field-error" id="puzzleErr" hidden>Not quite. The streak starts again with a new problem.</div>
       </div>
-    </div>
-
-    <div class="gate-step" id="gateReasonStep">
-      <div class="gate-step-label">3 · Answer honestly, in your own words</div>
-      <div class="reflection-box">
-        <div class="reflection-q">"${randomQ}"</div>
-        <textarea class="reflection-input" id="reasonInput" rows="3" placeholder="Write a real, specific reason (at least ${RESTRAINT_MIN_REASON_WORDS} words)..."></textarea>
-        <div class="field-error" id="reasonErr" style="display:none;"></div>
+    </li>
+    <li class="bp-step" id="stepReason">
+      <span class="bp-step-mark">3</span>
+      <div class="bp-reason">
+        <p class="bp-step-title">Say why, in your own words</p>
+        <p class="bp-reason-q">${question}</p>
+        <textarea class="field" id="reasonInput" rows="3" placeholder="At least ${RESTRAINT_MIN_REASON_WORDS} words"></textarea>
+        <div class="field-error" id="reasonErr" hidden></div>
       </div>
-    </div>
-  `;
+    </li>`;
 
-  const state = { timerDone: false, puzzleDone: false, reasonDone: false };
+  passSeg.innerHTML = PASS_OPTIONS.map((m, i) => (
+    `<button type="button" class="seg-btn${i === 0 ? " active" : ""}" role="radio" aria-checked="${i === 0}" data-value="${m}">${m} min</button>`
+  )).join("");
+  passSeg.querySelectorAll(".seg-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      passMinutes = Number(btn.dataset.value);
+      passSeg.querySelectorAll(".seg-btn").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-checked", b === btn ? "true" : "false");
+      });
+      refresh();
+    });
+  });
 
-  function maybeUnlock() {
-    if (state.timerDone && state.puzzleDone && state.reasonDone) unlockChallenge();
-  }
+  const state = { wait: false, puzzle: false, reason: false };
+  const stepEls = { wait: "stepWait", puzzle: "stepPuzzle", reason: "stepReason" };
 
-  function unlockChallenge() {
-    continueBtn.disabled = false;
-    continueBtn.textContent = `Continue to ${displayName}`;
-    continueBtn.classList.remove("btn-ghost");
-    continueBtn.classList.add("btn-accent");
-  }
-
-  // --- Step 1: mandatory, non-skippable wait ---
-  let rem = RESTRAINT_WAIT_SECONDS;
-  const circumference = 251.2;
-  const ringFill = document.getElementById("countdownRing");
-  const valEl = document.getElementById("countdownVal");
-
-  const timerInterval = setInterval(() => {
-    rem--;
-    if (valEl) valEl.textContent = rem > 0 ? rem : "0";
-    if (ringFill) {
-      const offset = circumference * (1 - rem / RESTRAINT_WAIT_SECONDS);
-      ringFill.style.strokeDashoffset = String(offset);
+  function refresh() {
+    let left = 0;
+    for (const key of Object.keys(state)) {
+      document.getElementById(stepEls[key]).classList.toggle("is-done", state[key]);
+      const mark = document.querySelector(`#${stepEls[key]} .bp-step-mark`);
+      mark.textContent = state[key] ? "✓" : String(Object.keys(state).indexOf(key) + 1);
+      if (!state[key]) left++;
     }
+    gateCount.textContent = left ? `${left} step${left === 1 ? "" : "s"} left` : "Done";
+    gateCount.classList.toggle("is-done", !left);
+    continueBtn.disabled = left > 0;
+    continueBtn.textContent = left ? "Complete the steps above" : `Open ${displayName} for ${passMinutes} min`;
+  }
+  refresh();
+
+  // --- 1: wait ---
+  let rem = RESTRAINT_WAIT_SECONDS;
+  const waitFill = document.getElementById("waitFill");
+  const waitVal = document.getElementById("waitVal");
+  const timer = setInterval(() => {
+    rem--;
+    waitVal.textContent = `${Math.max(rem, 0)}s`;
+    waitFill.style.width = `${((RESTRAINT_WAIT_SECONDS - rem) / RESTRAINT_WAIT_SECONDS) * 100}%`;
     if (rem <= 0) {
-      clearInterval(timerInterval);
-      state.timerDone = true;
-      maybeUnlock();
+      clearInterval(timer);
+      state.wait = true;
+      refresh();
     }
   }, 1000);
 
-  // --- Step 2: hard puzzle, streak required ---
-  let currentPuzzle = generateHardPuzzle();
+  // --- 2: problems ---
+  const input = document.getElementById("puzzleInput");
+  const err = document.getElementById("puzzleErr");
+  const checkBtn = document.getElementById("puzzleSubmitBtn");
+  let puzzle = generateHardPuzzle();
   let streak = 0;
 
-  function renderPuzzleProgress() {
-    const progress = document.getElementById("puzzleProgress");
-    if (!progress) return;
-    progress.innerHTML = Array.from({ length: RESTRAINT_PUZZLE_STREAK_REQUIRED })
+  function renderPuzzle() {
+    document.getElementById("puzzleQuestion").textContent = puzzle.question;
+    document.getElementById("puzzleProgress").innerHTML = Array.from({ length: RESTRAINT_PUZZLE_STREAK_REQUIRED })
       .map((_, i) => `<span class="gate-dot ${i < streak ? "gate-dot-filled" : ""}"></span>`)
       .join("");
   }
-
-  function renderPuzzleQuestion() {
-    const qEl = document.getElementById("puzzleQuestion");
-    if (qEl) qEl.textContent = currentPuzzle.question;
-    renderPuzzleProgress();
-  }
-
-  renderPuzzleQuestion();
+  renderPuzzle();
 
   function checkPuzzle() {
-    const input = document.getElementById("puzzleInput");
-    const err = document.getElementById("puzzleErr");
-    if (!input) return;
-    const val = Number(input.value);
-    if (input.value.trim() !== "" && val === currentPuzzle.answer) {
-      streak++;
-      if (err) err.style.display = "none";
-      if (streak >= RESTRAINT_PUZZLE_STREAK_REQUIRED) {
-        state.puzzleDone = true;
-        input.disabled = true;
-        const btn = document.getElementById("puzzleSubmitBtn");
-        if (btn) btn.disabled = true;
-        renderPuzzleProgress();
-        maybeUnlock();
-        return;
-      }
-      currentPuzzle = generateHardPuzzle();
-      renderPuzzleQuestion();
-      input.value = "";
-      input.focus();
-    } else {
-      streak = 0;
-      currentPuzzle = generateHardPuzzle();
-      renderPuzzleQuestion();
-      input.value = "";
-      input.focus();
-      if (err) err.style.display = "block";
+    if (input.value.trim() === "") return;
+    const correct = Number(input.value) === puzzle.answer;
+    streak = correct ? streak + 1 : 0;
+    err.hidden = correct;
+    if (streak >= RESTRAINT_PUZZLE_STREAK_REQUIRED) {
+      state.puzzle = true;
+      input.disabled = true;
+      checkBtn.disabled = true;
+      renderPuzzle();
+      refresh();
+      return;
     }
+    puzzle = generateHardPuzzle();
+    input.value = "";
+    input.focus();
+    renderPuzzle();
   }
-
-  document.getElementById("puzzleSubmitBtn").addEventListener("click", checkPuzzle);
-  document.getElementById("puzzleInput").addEventListener("keydown", (e) => {
+  checkBtn.addEventListener("click", checkPuzzle);
+  input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       checkPuzzle();
     }
   });
 
-  // --- Step 3: genuine written reason ---
+  // --- 3: reason ---
   const reasonInput = document.getElementById("reasonInput");
   const reasonErr = document.getElementById("reasonErr");
-
-  function checkReason() {
+  reasonInput.addEventListener("input", () => {
     const result = validateOpenReason(reasonInput.value);
-    state.reasonDone = result.valid;
-    if (reasonErr) {
-      reasonErr.style.display = result.valid ? "none" : "block";
-      reasonErr.textContent = result.message;
-    }
-    if (result.valid) maybeUnlock();
-  }
-
-  reasonInput.addEventListener("input", checkReason);
+    state.reason = result.valid;
+    reasonErr.hidden = result.valid;
+    reasonErr.textContent = result.message;
+    refresh();
+  });
 
   continueBtn.addEventListener("click", async () => {
     if (continueBtn.disabled) return;
     continueBtn.disabled = true;
-    continueBtn.textContent = "Opening website...";
+    continueBtn.textContent = "Opening…";
 
     let currentTabId = tabId;
-    if (!currentTabId && typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.getCurrent) {
+    if (!currentTabId) {
       try {
         const t = await chrome.tabs.getCurrent();
         if (t?.id) currentTabId = t.id;
@@ -351,42 +360,40 @@ function setupRestraintChallenge(site, destUrl) {
     }
 
     try {
-      if (typeof grantRestraintPass === "function") {
-        await grantRestraintPass(site, 15, currentTabId);
-      }
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-        await new Promise((resolve) => {
-          chrome.runtime.sendMessage(
-            { type: "GRANT_RESTRAINT_PASS", domain: site, durationMinutes: 15, tabId: currentTabId },
-            () => {
-              if (chrome.runtime.lastError) {
-                /* ignore if background worker is inactive */
-              }
-              resolve();
+      await grantRestraintPass(site, passMinutes, currentTabId);
+      await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "GRANT_RESTRAINT_PASS", domain: site, durationMinutes: passMinutes, tabId: currentTabId },
+          () => {
+            if (chrome.runtime.lastError) {
+              /* worker asleep — the pass written above still holds */
             }
-          );
-        });
-      }
-    } catch (err) {
-      console.error("[Stoic] Error granting restraint pass:", err);
+            resolve();
+          }
+        );
+      });
+    } catch (e) {
+      console.error("[Stoic] Error granting pass:", e);
     }
 
     window.location.href = destUrl || `https://${site}`;
   });
 }
 
+// Turning back must never land on the site that was just stopped:
+// history.back() returned to it, the rule tripped again, and the user was
+// stuck bouncing between the two (and the trip counter ran into hundreds).
 document.getElementById("closeBtn").addEventListener("click", async () => {
-  if (window.history.length > 1) {
-    window.history.back();
-    return;
+  try {
+    const tab = await chrome.tabs.getCurrent();
+    if (tab?.id) {
+      await chrome.tabs.update(tab.id, { url: "chrome://newtab" });
+      return;
+    }
+  } catch {
+    /* fall through */
   }
-  const tab = await chrome.tabs.getCurrent();
-
-  if (tab?.id) {
-    chrome.tabs.remove(tab.id);
-  } else {
-    window.close();
-  }
+  window.close();
 });
 
 main();

@@ -46,6 +46,7 @@ const {
   isScheduleDay,
   limitMinutesForDate,
   getDomainDisplayName,
+  wasSuspendedOn,
 } = commonApi;
 
 const {
@@ -96,7 +97,7 @@ function buildLiveDayView(sites, state) {
       }
     }
 
-    if (entry.paused) continue;
+    if (wasSuspendedOn(entry, dayKey)) continue;
     if (entry.mode === "limit" && isScheduleDay(entry, date)) {
       const limitSeconds = (limitMinutesForDate(entry, date) || 0) * 60;
       if (limitSeconds > 0 && seconds > limitSeconds + VIOLATION_TOLERANCE_SECONDS) violations++;
@@ -124,29 +125,28 @@ function buildLiveDayView(sites, state) {
 // invented for the same visual idea.
 function renderLevelIdentity(state) {
   const progress = xpProgressForLevel(state.level.xp);
-  const radius = 34;
+  const radius = 24;
   const circumference = Number((2 * Math.PI * radius).toFixed(2));
   const offset = (circumference * (1 - progress.pct / 100)).toFixed(1);
   const xpRemaining = Math.max(0, Math.round(progress.xpForNextLevel - progress.xpIntoLevel));
 
   return `
     <div class="prog-identity">
-      <div class="prog-ring">
-        <svg viewBox="0 0 80 80" class="prog-ring-svg">
-          <circle cx="40" cy="40" r="${radius}" class="prog-ring-bg" />
-          <circle cx="40" cy="40" r="${radius}" class="prog-ring-fill"
+      <div class="prog-ring" title="Level ${progress.level}">
+        <svg viewBox="0 0 56 56" class="prog-ring-svg">
+          <circle cx="28" cy="28" r="${radius}" class="prog-ring-bg" />
+          <circle cx="28" cy="28" r="${radius}" class="prog-ring-fill"
             style="stroke-dasharray: ${circumference}; stroke-dashoffset: ${offset};" />
         </svg>
-        <div class="prog-ring-label">
-          <span class="prog-ring-level">${progress.level}</span>
-          <span class="prog-ring-sub">Level</span>
-        </div>
+        <div class="prog-ring-label"><span class="prog-ring-level">${progress.level}</span></div>
       </div>
       <div class="prog-identity-body">
-        <div class="prog-rank-name">${progress.rank.name}</div>
+        <div class="prog-rank-name">Level ${progress.level} · ${progress.rank.name}</div>
         <div class="prog-rank-descriptor">${progress.rank.descriptor}</div>
+      </div>
+      <div class="prog-identity-xp">
         <div class="prog-xp-bar"><div class="prog-xp-bar-fill" style="width:${progress.pct.toFixed(1)}%;"></div></div>
-        <div class="prog-xp-note">${xpRemaining} XP to Level ${progress.level + 1} · ${Math.round(state.level.xp)} XP total</div>
+        <div class="prog-xp-note">${xpRemaining} XP to level ${progress.level + 1}</div>
       </div>
     </div>
   `;
@@ -178,18 +178,21 @@ function renderLevelUpBanner(state) {
 const CONDITION_DEFS = [
   {
     key: "c1",
-    label: "Adherence",
+    label: "Rules kept",
+    unmetWord: "Missed",
     describe: (snapshot) =>
       snapshot.violations === 0 ? "No rule broken" : `${snapshot.violations} rule${snapshot.violations === 1 ? "" : "s"} broken`,
   },
   {
     key: "c2",
-    label: "Restraint",
+    label: "Leisure under ceiling",
+    unmetWord: "Over",
     describe: (snapshot, config) => `${fmtDuration(snapshot.leisureSeconds)} leisure · ${config.leisureCeilingMinutes}m ceiling`,
   },
   {
     key: "c3",
-    label: "Focus",
+    label: "Focus target",
+    unmetWord: "Below",
     describe: (snapshot, config) => `${snapshot.focusScore} focus · ${config.focusTarget} target`,
   },
 ];
@@ -211,7 +214,8 @@ function renderTodayStanding(liveDay) {
     const waived = def.key === "c3" && conditions.focusWaived;
     const met = conditions[def.key];
     const chipState = waived ? "waived" : met ? "met" : "unmet";
-    const desc = waived ? "Waived — under 30m tracked today" : def.describe(snapshot, config);
+    const desc = waived ? "Under 30m tracked today" : def.describe(snapshot, config);
+    const stateWord = waived ? "Waived" : met ? "Held so far" : def.unmetWord;
     return `
       <div class="prog-condition prog-condition-${chipState}">
         <span class="prog-condition-dot"></span>
@@ -219,6 +223,7 @@ function renderTodayStanding(liveDay) {
           <span class="prog-condition-label">${def.label}</span>
           <span class="prog-condition-value">${desc}</span>
         </div>
+        <span class="prog-condition-state">${stateWord}</span>
       </div>
     `;
   }).join("");
@@ -228,10 +233,10 @@ function renderTodayStanding(liveDay) {
 
 // ---------- renderStreaks ----------
 
+const days = (n) => `${n} day${n === 1 ? "" : "s"}`;
+
 function renderStreaks(state) {
   const discipline = state.streaks.discipline;
-  const bestRange = discipline.bestStart && discipline.bestEnd ? ` (${discipline.bestStart} – ${discipline.bestEnd})` : "";
-
   const ruleEntries = Object.entries(state.streaks.rules || {}).sort((a, b) => b[1].current - a[1].current);
   const ruleRows = ruleEntries.length
     ? ruleEntries
@@ -239,23 +244,22 @@ function renderStreaks(state) {
           ([domain, rule]) => `
       <div class="prog-rule-streak-row">
         <span class="prog-rule-domain" title="${domain}">${getDomainDisplayName(domain)}</span>
-        <span class="prog-rule-streak-value">${rule.current} current · ${rule.best} best</span>
-      </div>
-    `
+        <span class="prog-rule-streak-value">${days(rule.current)} <span>· best ${rule.best}</span></span>
+      </div>`
         )
         .join("")
-    : `<div class="prog-condition-empty">No rule streaks yet.</div>`;
+    : `<div class="prog-condition-empty">Rule streaks appear after the first day a rule is in force.</div>`;
 
   return `
     <div class="prog-streaks">
       <div class="prog-streak-pair">
         <div class="prog-streak-block">
-          <span class="prog-streak-value">${discipline.current}</span>
-          <span class="prog-streak-label">Current streak</span>
+          <span class="prog-streak-value">${discipline.current}<small>days</small></span>
+          <span class="prog-streak-label">Days held in a row</span>
         </div>
         <div class="prog-streak-block">
-          <span class="prog-streak-value">${discipline.best}</span>
-          <span class="prog-streak-label">Best streak${bestRange}</span>
+          <span class="prog-streak-value">${discipline.best}<small>days</small></span>
+          <span class="prog-streak-label">Best${discipline.bestStart ? `, ${discipline.bestStart} – ${discipline.bestEnd}` : ""}</span>
         </div>
       </div>
       <div class="prog-rule-streaks">${ruleRows}</div>
@@ -319,7 +323,8 @@ function renderContributionGrid(state) {
       const day = byDate.get(key);
       const status = cellStatus(day);
       const title = day ? `${key} · ${status}` : `${key} · no data`;
-      cellsHtml += `<span class="prog-cell prog-cell-${status}" style="grid-column:${col + 1}; grid-row:${row + 1};" title="${title}"></span>`;
+      const todayCls = key === todayKey ? " prog-cell-today" : "";
+      cellsHtml += `<span class="prog-cell prog-cell-${status}${todayCls}" style="grid-column:${col + 1}; grid-row:${row + 1};" title="${title}"></span>`;
     }
   }
 
@@ -328,12 +333,10 @@ function renderContributionGrid(state) {
       <div class="prog-grid-months">${monthsHtml}</div>
       <div class="prog-grid">${cellsHtml}</div>
       <div class="prog-grid-legend">
-        <span class="prog-grid-legend-lbl">Less</span>
-        <span class="prog-cell prog-cell-absent"></span>
-        <span class="prog-cell prog-cell-missed"></span>
-        <span class="prog-cell prog-cell-partial"></span>
-        <span class="prog-cell prog-cell-held"></span>
-        <span class="prog-grid-legend-lbl">More</span>
+        <span class="prog-grid-legend-item"><span class="prog-cell prog-cell-held"></span>Held</span>
+        <span class="prog-grid-legend-item"><span class="prog-cell prog-cell-partial"></span>Partly held</span>
+        <span class="prog-grid-legend-item"><span class="prog-cell prog-cell-missed"></span>Missed</span>
+        <span class="prog-grid-legend-item"><span class="prog-cell prog-cell-absent"></span>No data</span>
       </div>
     </div>
   `;
@@ -350,20 +353,22 @@ const RECORD_FORMATTERS = {
 };
 
 function renderRecords(state) {
-  const tiles = RECORDS.map((def) => {
+  const rows = RECORDS.map((def) => {
     const record = state.records[def.id];
     const format = RECORD_FORMATTERS[def.id] || ((v) => `${v}`);
     const value = record ? format(record.value) : "—";
-    const meta = record && record.meta && record.meta.domain ? ` · ${getDomainDisplayName(record.meta.domain)}` : "";
+    const meta = [
+      record && record.meta && record.meta.domain ? getDomainDisplayName(record.meta.domain) : "",
+      record ? record.date : "",
+    ].filter(Boolean).join(" · ");
     return `
-      <div class="prog-record-tile">
-        <div class="prog-record-value">${value}${meta}</div>
-        <div class="prog-record-label">${def.label}</div>
-        ${record ? `<div class="prog-record-date">${record.date}</div>` : ""}
-      </div>
-    `;
+      <div class="prog-record-row">
+        <dt>${def.label}</dt>
+        <dd>${value}</dd>
+        ${meta ? `<span class="prog-record-meta">${meta}</span>` : ""}
+      </div>`;
   }).join("");
-  return `<div class="prog-records">${tiles}</div>`;
+  return `<dl class="prog-records">${rows}</dl>`;
 }
 
 // ---------- renderAchievements ----------
@@ -417,16 +422,17 @@ function renderAchievements(state) {
     .join("");
 
   return `
-    <div class="prog-achievements">
+    <details class="prog-achievements">
+      <summary>Achievements<span class="prog-achievements-count">${earned.length} of ${ACHIEVEMENTS.length} earned</span></summary>
       <div class="prog-achievement-group">
-        <div class="section-label small">Earned (${earned.length}/${ACHIEVEMENTS.length})</div>
+        <div class="section-label small">Earned</div>
         <div class="prog-achievement-grid">${earnedHtml}</div>
       </div>
       <div class="prog-achievement-group">
-        <div class="section-label small">Locked</div>
+        <div class="section-label small">Still to earn</div>
         <div class="prog-achievement-grid">${lockedHtml}</div>
       </div>
-    </div>
+    </details>
   `;
 }
 
@@ -443,24 +449,15 @@ function renderLifetime(state) {
     { value: fmtDuration(l.trackedSeconds || 0), label: "Time tracked" },
     { value: fmtDuration(l.productiveSeconds || 0), label: "Productive time" },
     { value: fmtDuration(l.leisureSeconds || 0), label: "Leisure time" },
-    { value: l.refusals || 0, label: "Refusals" },
-    { value: l.gatesShown || 0, label: "Gates shown" },
-    { value: l.gatesPassed || 0, label: "Gates passed" },
-    { value: l.violations || 0, label: "Violations" },
+    { value: l.refusals || 0, label: "Turned back" },
+    { value: l.gatesShown || 0, label: "Times stopped" },
+    { value: l.gatesPassed || 0, label: "Went through the pause" },
+    { value: l.violations || 0, label: "Rules missed" },
     { value: l.rulesCreated || 0, label: "Rules created" },
     { value: l.rulesLoosened || 0, label: "Rules loosened" },
   ];
-  const cells = tiles
-    .map(
-      (t) => `
-      <div class="stat-cell">
-        <div class="stat-value">${t.value}</div>
-        <div class="stat-label">${t.label}</div>
-      </div>
-    `
-    )
-    .join("");
-  return `<div class="stat-grid">${cells}</div>`;
+  const rows = tiles.map((t) => `<div><dt>${t.label}</dt><dd>${t.value}</dd></div>`).join("");
+  return `<dl class="prog-lifetime">${rows}</dl>`;
 }
 
 // ---------- renderPopupStrip ----------

@@ -78,13 +78,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optTodayTotal = document.getElementById("optTodayTotal");
   const optFocusScore = document.getElementById("optFocusScore");
   const optTopWebsitesList = document.getElementById("optTopWebsitesList");
-  const optOverviewRulesActive = document.getElementById("optOverviewRulesActive");
   const optOverviewTrippedCount = document.getElementById("optOverviewTrippedCount");
   const optOverviewRefusals = document.getElementById("optOverviewRefusals");
 
-  // Moderation Rules Summary Refs
-  const optModLimitedCount = document.getElementById("optModLimitedCount");
-  const optModTrippedCount = document.getElementById("optModTrippedCount");
 
   // Panel & Grid Refs
   const optDisciplinesGrid = document.getElementById("optDisciplinesGrid");
@@ -104,7 +100,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optAnalyticsChart = document.getElementById("optAnalyticsChart");
   const optCategoryGrid = document.getElementById("optCategoryGrid");
   const optDomainAuditTable = document.getElementById("optDomainAuditTable");
-  const optStreaksList = document.getElementById("optStreaksList");
 
   // Progress tab refs (progression-ui.js fills these; options.js never
   // builds progression markup itself, per 02-ARCHITECTURE.md §7).
@@ -137,6 +132,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const optModalExceptionMinutes = document.getElementById("optModalExceptionMinutes");
 
   const optModalRestraintRow = document.getElementById("optModalRestraintRow");
+  const optModalActionRow = document.getElementById("optModalActionRow");
+  const optModalActionSeg = document.getElementById("optModalActionSeg");
+  const optModalRedirect = document.getElementById("optModalRedirect");
+  const optModalRedirectError = document.getElementById("optModalRedirectError");
 
   // Friction Gate refs — the same wait/puzzle/reason challenge the
   // restraint interstitial uses, applied here so Settings can never be an
@@ -294,6 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const isLoosening = isLooseningRule;
 
   let modalMode = "limit";
+  let modalAction = "page";
 
   // Per-day exceptions: minutes keyed by JS day index (0=Sun…6=Sat). Lets a
   // site that's otherwise "always closed" or "pause first" carry a "but N
@@ -368,9 +368,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireSegmented(optModalModeSeg, (val) => {
     modalMode = val;
-    optModalLimitRow.hidden = val !== "limit";
-    if (optModalRestraintRow) optModalRestraintRow.hidden = val !== "restraint";
+    syncModalModeRows();
   });
+
+  wireSegmented(optModalActionSeg, (val) => setModalAction(val));
 
   if (siteSearchInput) {
     siteSearchInput.addEventListener("input", (e) => {
@@ -499,70 +500,123 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  const MODE_LABELS = { limit: "Daily limit", restraint: "Pause first", block: "Always closed" };
+  let progState = null;
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+  }
+
+  const catClass = (macro) => `cat-${String(macro || "General").toLowerCase()}`;
+  const scoreTier = (score) => (score >= 70 ? "is-held" : score >= 45 ? "is-partial" : "is-missed");
+  const monogram = (name) => esc((String(name || "?").charAt(0) || "?").toUpperCase());
+
+  // Total tracked seconds per day for the last `n` days, oldest first.
+  function dailyTotals(n) {
+    const now = new Date();
+    const todayKey = dateKey(now);
+    const out = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const d = addDays(now, -i);
+      const key = dateKey(d);
+      let seconds = 0;
+      for (const entry of Object.values(sites)) seconds += usageSecondsForDate(entry, key, todayKey);
+      out.push({ key, label: DAY_LABELS[d.getDay()], seconds, isToday: i === 0 });
+    }
+    return out;
+  }
+
+  function ruleTag(entry) {
+    if (!entryHasRule(entry)) return "";
+    const suspended = isRuleSuspended(entry);
+    return `<span class="tag tag-${entry.mode}${suspended ? " tag-suspended" : ""}">${suspended ? "Suspended" : MODE_LABELS[entry.mode]}</span>`;
+  }
+
+  // Today's position of a daily-limit rule: used, limit, and how it reads.
+  function limitPosition(entry, now = new Date()) {
+    const today = todayStr();
+    const usedSec = usageSecondsForDate(entry, today, today);
+    const limitMin = limitMinutesForDate(entry, now);
+    const pct = limitMin ? Math.min(100, Math.round((usedSec / (limitMin * 60)) * 100)) : 0;
+    const spent = limitMin > 0 && usedSec >= limitMin * 60;
+    const cls = spent ? "is-missed" : pct >= 75 ? "is-partial" : "";
+    return { usedSec, limitMin, pct, spent, cls };
+  }
+
   function renderAll() {
     const today = todayStr();
     const browsing = getBrowsingStats(sites, today);
     const moderation = getModerationStats(sites, today);
     const focusScore = calculateFocusScore(sites, today);
+    const totals = dailyTotals(7);
 
-    // 1. Overview Hero Summary & Focus Score Component
+    const dateEl = document.getElementById("optTodayDate");
+    if (dateEl) dateEl.textContent = new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+
     if (optTodayTotal) optTodayTotal.textContent = fmtDuration(browsing.totalSeconds);
-    if (optFocusScore) optFocusScore.textContent = `${focusScore}%`;
-
-    const optFocusGaugePath = document.getElementById("optFocusGaugePath");
-    const optFocusScoreSub = document.getElementById("optFocusScoreSub");
-    if (optFocusGaugePath) {
-      optFocusGaugePath.setAttribute("stroke-dasharray", `${focusScore}, 100`);
-      // Descriptive, never a verdict — and it avoids the word "restraint",
-      // which the glossary reserves for the pause (docs/GLOSSARY.md §2).
-      if (focusScore >= 80) {
-        optFocusGaugePath.style.stroke = "var(--held)";
-        if (optFocusScoreSub) optFocusScoreSub.textContent = "Mostly productive time";
-      } else if (focusScore >= 50) {
-        optFocusGaugePath.style.stroke = "var(--partial)";
-        if (optFocusScoreSub) optFocusScoreSub.textContent = "A mixed day so far";
-      } else {
-        optFocusGaugePath.style.stroke = "var(--missed)";
-        if (optFocusScoreSub) optFocusScoreSub.textContent = "Mostly leisure time";
-      }
+    const vsAvg = document.getElementById("optTodayVsAvg");
+    if (vsAvg) {
+      const prior = totals.slice(0, 6).filter((d) => d.seconds > 0);
+      vsAvg.textContent = prior.length
+        ? `Daily average ${fmtDuration(prior.reduce((sum, d) => sum + d.seconds, 0) / prior.length)}`
+        : "Across every site";
     }
 
-    // 2. Overview Top Websites (Compact Ranked List: Favicon, Name, Usage Bar, Time, Percentage)
-    renderOverviewTopWebsites(browsing.topWebsites);
+    const tracked = browsing.totalSeconds;
+    const focusMeter = document.getElementById("optFocusMeter");
+    const focusSub = document.getElementById("optFocusScoreSub");
+    if (optFocusScore) {
+      optFocusScore.textContent = tracked > 0 ? `${focusScore}` : "—";
+      optFocusScore.className = `kpi-value ${tracked > 0 ? scoreTier(focusScore) : ""}`;
+    }
+    if (focusMeter) {
+      focusMeter.style.width = `${tracked > 0 ? focusScore : 0}%`;
+      focusMeter.className = `meter-fill ${scoreTier(focusScore)}`;
+    }
+    if (focusSub) {
+      // Descriptive, never a verdict (docs/GLOSSARY.md §3).
+      focusSub.textContent = tracked === 0 ? "Nothing tracked yet"
+        : focusScore >= 70 ? "Mostly productive time"
+        : focusScore >= 45 ? "A mixed day so far"
+        : "Mostly leisure time";
+    }
 
-    // 3. Overview Behaviour Summary (Compact Row: Limits Triggered, Rules Active, Time Saved)
     if (optOverviewTrippedCount) optOverviewTrippedCount.textContent = moderation.limitsTriggeredToday;
-    if (optOverviewRulesActive) optOverviewRulesActive.textContent = moderation.limitedSitesCount;
     renderLifetimeRefusals();
 
-    // 4. Detailed Analysis AI Insight
     const optInsightText = document.getElementById("optInsightText");
     if (optInsightText) optInsightText.textContent = generateQuickInsight(sites, today);
 
-    // 5. Rules Moderation Performance Summary
-    if (optModLimitedCount) optModLimitedCount.textContent = moderation.limitedSitesCount;
-    if (optModTrippedCount) optModTrippedCount.textContent = moderation.limitsTriggeredToday;
-
+    renderOverviewTopWebsites(browsing.topWebsites);
+    renderRulesNow();
     renderSyncSection();
-    renderAnalytics(browsing);
-    renderDisciplines(moderation);
+    renderAnalytics(browsing, totals);
+    renderDisciplines();
     renderChannelsTable();
     renderProgress().catch((err) => console.error("[Stoic] progress tab render failed", err));
   }
 
-  // Fills the Progress tab from progression-ui.js's render functions, and
-  // the two Daily Standard fields on the Preferences tab. options.js never
-  // builds progression markup itself — that would let this surface and
-  // popup.js drift (02-ARCHITECTURE.md §7).
+  // progression-ui.js owns the progression markup; options.js only places
+  // it (02-ARCHITECTURE.md §7).
   async function renderProgress() {
     const prog = await loadProgression();
+    const hadProg = !!progState;
+    progState = prog;
+    // Rule rows show each rule's streak, which lives in the ledger.
+    if (!hadProg) renderDisciplines();
 
     if (progIdentityContainer) progIdentityContainer.innerHTML = renderLevelIdentity(prog);
     if (progStandingContainer) progStandingContainer.innerHTML = renderTodayStanding(buildLiveDayView(sites, prog));
     if (progStreaksContainer) progStreaksContainer.innerHTML = renderStreaks(prog);
     if (progGridContainer) progGridContainer.innerHTML = renderContributionGrid(prog);
     if (progRecordsContainer) progRecordsContainer.innerHTML = renderRecords(prog);
-    if (progAchievementsContainer) progAchievementsContainer.innerHTML = renderAchievements(prog);
+    if (progAchievementsContainer) {
+      const wasOpen = !!progAchievementsContainer.querySelector("details[open]");
+      progAchievementsContainer.innerHTML = renderAchievements(prog);
+      if (wasOpen) progAchievementsContainer.querySelector("details").open = true;
+    }
     if (progLifetimeContainer) progLifetimeContainer.innerHTML = renderLifetime(prog);
 
     if (progLevelUpBannerOptions) {
@@ -576,8 +630,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    // Don't clobber a value the user is mid-edit on — a re-render can be
-    // triggered by an unrelated rule save while this tab happens to be open.
     if (optLeisureCeilingInput && document.activeElement !== optLeisureCeilingInput) {
       optLeisureCeilingInput.value = prog.config.leisureCeilingMinutes;
     }
@@ -588,166 +640,156 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderOverviewTopWebsites(topWebsites) {
     if (!optTopWebsitesList) return;
-    optTopWebsitesList.innerHTML = "";
+    const list = (topWebsites || []).filter((item) => item.seconds > 0);
+    const countEl = document.getElementById("optSitesCount");
+    if (countEl) countEl.textContent = list.length ? `${list.length} site${list.length === 1 ? "" : "s"}` : "";
 
-    if (!topWebsites || topWebsites.length === 0) {
-      optTopWebsitesList.innerHTML = emptyState(
-        "Nothing tracked today",
-        "Sites appear here once you have spent a minute on them."
-      );
+    if (list.length === 0) {
+      optTopWebsitesList.innerHTML = emptyState("Nothing tracked yet today", "Time is counted while a site is the tab you're looking at.");
       return;
     }
 
-    const top5 = topWebsites.slice(0, 5);
-    top5.forEach((item) => {
-      const displayName = getDomainDisplayName(item.domain);
-      const initial = (displayName.charAt(0) || "?").toUpperCase();
+    const maxSec = Math.max(1, list[0].seconds);
+    // A monogram, not a favicon: fetching favicons from Google would hand
+    // over the user's most-visited domains every time this page renders.
+    optTopWebsitesList.innerHTML = list.slice(0, 8).map((item) => {
+      const name = getDomainDisplayName(item.domain);
+      const macro = (item.taxonomy && item.taxonomy.macro) || "General";
+      const fill = Math.max(2, Math.round((item.seconds / maxSec) * 100));
+      return `
+        <div class="site-row ${catClass(macro)}">
+          <span class="avatar">${monogram(name)}</span>
+          <div class="site-main">
+            <div class="site-name-line">
+              <span class="site-name">${esc(name)}</span>
+              ${ruleTag(item.entry)}
+              <span class="site-domain" title="${esc(MACRO_CATEGORIES[macro]?.label || macro)}">${esc(item.domain)}</span>
+            </div>
+            <div class="site-bar"><div class="site-bar-fill" style="width:${fill}%"></div></div>
+          </div>
+          <span class="site-time">${fmtDuration(item.seconds)}</span>
+          <span class="site-pct">${item.pctOfTotal}%</span>
+        </div>`;
+    }).join("");
+  }
 
-      const row = document.createElement("div");
-      row.className = "top-site-row";
-      // A monogram, not a favicon. Fetching favicons from Google would send
-      // the user's most-visited domains to Google every time this page
-      // renders, which is exactly the thing the product promises it doesn't do.
-      row.innerHTML = `
-        <div class="top-site-favicon-box">
-          <span class="top-site-avatar-fallback">${initial}</span>
-        </div>
-        <div class="top-site-name">${displayName}</div>
-        <div class="top-site-bar-container">
-          <div class="top-site-bar-fill" style="width: ${Math.max(4, item.pctOfTotal)}%;"></div>
-        </div>
-        <div class="top-site-time">${fmtDuration(item.seconds)}</div>
-        <div class="top-site-pct">${item.pctOfTotal}%</div>
-      `;
-      optTopWebsitesList.appendChild(row);
-    });
+  // The live "how am I doing against each rule" list on Today.
+  function renderRulesNow() {
+    const el = document.getElementById("optRulesNow");
+    if (!el) return;
+    const today = todayStr();
+    const domains = Object.keys(sites).filter((d) => entryHasRule(sites[d]));
+    if (domains.length === 0) {
+      el.innerHTML = emptyState("No rules yet", "Add one from the Rules tab or from the toolbar while you're on the site.");
+      return;
+    }
+    el.innerHTML = domains
+      .sort((a, b) => getDomainDisplayName(a).localeCompare(getDomainDisplayName(b)))
+      .map((domain) => {
+        const entry = sites[domain];
+        const status = ruleStatus(entry);
+        const trips = tripsForDate(entry, today, today);
+        let value = `${trips}× stopped`;
+        let bar = "";
+        let statusText = status.text;
+        let statusCls = status.state;
+        if (entry.mode === "limit" && status.state === "active") {
+          const pos = limitPosition(entry);
+          value = `${fmtDuration(pos.usedSec)} / ${pos.limitMin}m`;
+          bar = `<div class="rule-bar"><div class="rule-bar-fill ${pos.cls}" style="width:${pos.pct}%"></div></div>`;
+          if (pos.spent) { statusText = "Spent for today"; statusCls = "spent"; }
+          else statusText = `${fmtMinutes(pos.limitMin - pos.usedSec / 60)} left`;
+        } else if (status.state === "active") {
+          statusText = MODE_LABELS[entry.mode];
+        }
+        return `
+          <div class="now-row">
+            <span class="now-name">${esc(getDomainDisplayName(domain))}</span>
+            <span class="now-value">${value}</span>
+            <span class="status status-${statusCls}">${esc(statusText)}</span>
+            ${bar}
+          </div>`;
+      }).join("");
   }
 
   function renderSyncSection() {
     if (optSyncToggle) optSyncToggle.checked = storagePref === "sync";
   }
 
-  function renderAnalytics(browsing) {
-    const today = new Date();
-
-    // 7-Day Usage Aggregation Chart
-    const daysMap = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = addDays(today, -i);
-      const key = dateKey(d);
-      daysMap[key] = { label: DAY_LABELS[d.getDay()], seconds: 0 };
-    }
-
-    Object.values(sites).forEach((entry) => {
-      const week = trailingWeekUsage(entry, today);
-      week.forEach((w) => {
-        if (daysMap[w.date]) {
-          daysMap[w.date].seconds += w.seconds;
-        }
-      });
-    });
-
-    const maxSec = Math.max(1, ...Object.values(daysMap).map((d) => d.seconds));
+  function renderAnalytics(browsing, totals) {
     if (optAnalyticsChart) {
-      optAnalyticsChart.innerHTML = "";
+      const maxSec = Math.max(1, ...totals.map((d) => d.seconds));
+      const weekTotal = totals.reduce((sum, d) => sum + d.seconds, 0);
+      const weekTotalEl = document.getElementById("optWeekTotal");
+      if (weekTotalEl) weekTotalEl.textContent = weekTotal ? `${fmtDuration(weekTotal)} in total` : "";
 
-      // Seven bars all at zero is not a chart, it is a misleading blank.
-      if (maxSec <= 1) {
-        optAnalyticsChart.innerHTML = emptyState(
-          "No week to show yet",
-          "After a day or two of tracking, the last seven days appear here."
-        );
+      if (weekTotal === 0) {
+        optAnalyticsChart.innerHTML = emptyState("No week to show yet", "After a day or two of tracking, the last seven days appear here.");
       } else {
-        Object.values(daysMap).forEach((day) => {
-          const col = document.createElement("div");
-          col.className = "chart-bar-col";
-          const heightPct = day.seconds > 0 ? Math.max(6, Math.round((day.seconds / maxSec) * 100)) : 0;
-          const displayVal = day.seconds > 0 ? fmtDuration(day.seconds) : "0m";
-
-          col.innerHTML = `
-            <div class="chart-val">${displayVal}</div>
-            <div class="chart-bar" style="height:${heightPct}%"></div>
-            <div class="chart-label">${day.label}</div>
-          `;
-          optAnalyticsChart.appendChild(col);
-        });
+        optAnalyticsChart.innerHTML = totals.map((day) => {
+          const h = day.seconds > 0 ? Math.max(3, Math.round((day.seconds / maxSec) * 100)) : 0;
+          return `
+            <div class="week-col${day.isToday ? " is-today" : ""}" title="${day.key}">
+              <span class="week-val">${day.seconds > 0 ? fmtDuration(day.seconds) : ""}</span>
+              <div class="week-bar" style="height:${h}%"></div>
+              <span class="week-label">${day.isToday ? "Today" : day.label}</span>
+            </div>`;
+        }).join("");
       }
     }
 
-    // Category Grid
     renderCategoryGrid(browsing.categoryBreakdown);
-
-    // Websites Visited Audit Table
     renderAuditTable(browsing);
   }
 
   function renderCategoryGrid(categoryBreakdown) {
     if (!optCategoryGrid) return;
-    optCategoryGrid.innerHTML = "";
+    const macros = (categoryBreakdown && categoryBreakdown.macroBreakdown) || [];
 
-    const macroBreakdown = categoryBreakdown?.macroBreakdown || [];
-
-    if (!macroBreakdown || macroBreakdown.length === 0) {
+    if (macros.length === 0) {
       optCategoryGrid.innerHTML = emptyState(
-        "Nothing to break down yet",
-        "Once a few minutes are tracked, this shows how the day split between productive, general and leisure time."
+        "Nothing to split yet",
+        "Once a few minutes are tracked, this shows how the day divided between productive, general and leisure time."
       );
       return;
     }
 
-    const colorMap = {
-      Productivity: "var(--held)",
-      General: "var(--waived)",
-      Leisure: "var(--partial)",
-    };
-
     const today = todayStr();
+    const bar = macros
+      .map((mac) => `<div class="split-seg ${catClass(mac.macro)}" style="width:${mac.pctOfTotal}%" title="${esc(mac.macro)} ${mac.pctOfTotal}%"></div>`)
+      .join("");
 
-    macroBreakdown.forEach((mac) => {
-      const card = document.createElement("div");
-      card.className = "category-card";
-
-      const barColor = colorMap[mac.macro] || "var(--accent)";
-      const microItemsHtml = mac.micros.map((m) => {
-        // "Why?" only appears where YouTube actually contributed to this
-        // bucket today — showing it everywhere would mean guessing at an
-        // explanation for buckets nothing on YouTube touched (audit R5).
+    const groups = macros.map((mac) => {
+      const label = MACRO_CATEGORIES[mac.macro]?.label || mac.macro;
+      const micros = mac.micros.map((m) => {
+        // "Why?" only where YouTube actually contributed to this bucket (audit R5).
         const why = explainCategoryToday(mac.macro, m.micro, sites, today);
         const whyKey = `${mac.macro}|${m.micro}`;
         return `
-        <div class="micro-item-row">
-          <span class="micro-item-name">${m.micro}</span>
-          <span class="micro-item-time">${fmtDuration(m.seconds)} (${m.pctOfMacro}% of ${mac.macro.toLowerCase()})</span>
-          ${why ? `<button class="btn-ghost btn-compact why-toggle-btn" type="button" data-why-for="${whyKey}">Why?</button>` : ""}
-        </div>
-        ${why ? `
-          <div class="why-panel" data-why-panel="${whyKey}" hidden>
-            <p class="why-sentence">${why.sentence}</p>
-            <button class="btn-ghost btn-compact why-classify-btn" type="button" data-channel-id="${why.channelId || ""}" data-channel-name="${why.channelName || ""}" data-macro="${mac.macro}" data-micro="${m.micro}">Classify this channel</button>
+          <div class="micro-item-row">
+            <span class="micro-item-name">${esc(m.micro)}</span>
+            <span class="micro-item-time">${fmtDuration(m.seconds)}</span>
+            ${why ? `<button class="btn-ghost btn-compact why-toggle-btn" type="button" data-why-for="${esc(whyKey)}">Why?</button>` : ""}
           </div>
-        ` : ""}`;
+          ${why ? `
+            <div class="why-panel" data-why-panel="${esc(whyKey)}" hidden>
+              <p class="why-sentence">${esc(why.sentence)}</p>
+              <button class="btn-ghost btn-compact why-classify-btn" type="button" data-channel-id="${esc(why.channelId || "")}" data-channel-name="${esc(why.channelName || "")}" data-macro="${esc(mac.macro)}" data-micro="${esc(m.micro)}">Classify this channel</button>
+            </div>` : ""}`;
       }).join("");
-
-      card.innerHTML = `
-        <div class="cat-card-header">
-          <span class="cat-card-title">
-            <span class="macro-badge macro-${mac.macro.toLowerCase()}">${mac.macro}</span>
-          </span>
-          <span class="cat-card-pct">${mac.pctOfTotal}% of total</span>
-        </div>
-        <div class="cat-card-val">${fmtDuration(mac.seconds)}</div>
-        <div class="cat-progress-bg">
-          <div class="cat-progress-fill" style="width:${mac.pctOfTotal}%; background:${barColor};"></div>
-        </div>
-        ${mac.micros.length > 0 ? `
-          <div class="micro-list-container">
-            ${microItemsHtml}
+      return `
+        <div class="split-group ${catClass(mac.macro)}">
+          <div class="split-head">
+            <span class="cat-dot ${catClass(mac.macro)}"></span>
+            <span class="split-name">${esc(label)}</span>
+            <span class="split-time">${fmtDuration(mac.seconds)}</span>
+            <span class="split-pct">${mac.pctOfTotal}%</span>
           </div>
-        ` : ""}
-      `;
-      optCategoryGrid.appendChild(card);
-    });
+          ${micros ? `<div class="split-micros">${micros}</div>` : ""}
+        </div>`;
+    }).join("");
 
+    optCategoryGrid.innerHTML = `<div class="split-bar">${bar}</div>${groups}`;
     wireWhyControls(optCategoryGrid);
   }
 
@@ -770,287 +812,306 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function renderAuditTable(browsing) {
     if (!optDomainAuditTable) return;
-    optDomainAuditTable.innerHTML = "";
+    const list = (browsing.topWebsites || []).filter((item) => item.seconds > 0);
 
-    if (!browsing.topWebsites || browsing.topWebsites.length === 0) {
+    if (list.length === 0) {
       optDomainAuditTable.innerHTML = emptyState(
-        "Nothing tracked today",
-        "Every site you spend a minute on appears here, with the option to put a rule on it."
+        "Nothing tracked yet today",
+        "Every site you spend time on appears here, with a rule one click away."
       );
       return;
     }
 
-    let html = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Website</th>
-            <th>Hierarchy (Macro & Micro)</th>
-            <th>Tracked Today</th>
-            <th>Status & Moderation</th>
-            <th style="text-align:right;">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-
-    // Derived from the taxonomy in common.js rather than duplicated here,
-    // so adding a category in one place is enough.
+    // Derived from the taxonomy in common.js so a new category only needs
+    // adding in one place.
     const taxonomyGroups = selectableMicrosByMacro();
     const today = todayStr();
 
-    browsing.topWebsites.forEach((item) => {
-      const displayName = getDomainDisplayName(item.domain);
+    const rows = list.map((item) => {
+      const name = getDomainDisplayName(item.domain);
       const { macro, micro } = item.taxonomy || getDomainTaxonomy(item.domain, sites);
 
-      const badge = (label, bg, fg, bd) =>
-        `<span class="rule-badge" style="background:${bg}; color:${fg}; border-color:${bd};">${label}</span>`;
-
-      let statusBadge = badge("No rule", "transparent", "var(--text-faint)", "var(--border-soft)");
-      if (item.paused) {
-        statusBadge = badge("Paused", "var(--bg-raised)", "var(--text-faint)", "var(--border-soft)");
-      } else if (item.mode === "limit") {
-        statusBadge = badge(`${item.entry.limitMinutes || 30}m a day`, "var(--partial-dim)", "var(--partial-soft)", "var(--partial-border)");
-      } else if (item.mode === "block") {
-        statusBadge = badge("Always closed", "var(--missed-dim)", "var(--missed-soft)", "var(--missed-border)");
-      } else if (item.mode === "restraint") {
-        statusBadge = badge("Pause first", "var(--waived-dim)", "var(--waived-soft)", "var(--waived-border)");
-      }
-
-      let categoryOptionsHtml = "";
-      Object.keys(taxonomyGroups).forEach((macGroup) => {
-        categoryOptionsHtml += `<optgroup label="${macGroup}">`;
-        taxonomyGroups[macGroup].forEach((micOpt) => {
-          categoryOptionsHtml += `<option value="${micOpt}" ${micro === micOpt ? "selected" : ""}>${micOpt}</option>`;
+      let options = "";
+      Object.keys(taxonomyGroups).forEach((group) => {
+        options += `<optgroup label="${esc(MACRO_CATEGORIES[group]?.label || group)}">`;
+        taxonomyGroups[group].forEach((opt) => {
+          options += `<option value="${esc(opt)}" ${micro === opt ? "selected" : ""}>${esc(opt)}</option>`;
         });
-        categoryOptionsHtml += `</optgroup>`;
+        options += `</optgroup>`;
       });
+      if (micro && !MICRO_TO_MACRO[micro]) options += `<option value="${esc(micro)}" selected>${esc(micro)}</option>`;
+      options += `<option value="__custom__">New category…</option>`;
 
-      if (!MICRO_TO_MACRO[micro] && micro) {
-        categoryOptionsHtml += `<option value="${micro}" selected>${micro}</option>`;
-      }
-      categoryOptionsHtml += `<option value="__custom__">+ Custom Micro Category...</option>`;
+      // The debugger's replacement (audit R5): YouTube rows only.
+      const why = isYouTubeDomain(item.domain) ? explainDomainToday(item.domain, sites, today) : null;
 
-      const macroBadgeHtml = `<span class="macro-badge macro-${macro.toLowerCase()}">${macro}</span>`;
-      const catSelectHtml = `
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          ${macroBadgeHtml}
-          <select class="audit-cat-select" data-domain="${item.domain}" style="padding:4px 8px; font-size:11px; border-radius:6px; border:1px solid var(--border-soft); background:var(--bg-panel); color:var(--text-primary); cursor:pointer;">
-            ${categoryOptionsHtml}
-          </select>
-        </div>
-      `;
-
-      // The debugger's replacement (audit R5): a one-sentence "why" for
-      // YouTube rows only — every other domain's category is exactly what
-      // it says on the tin, with nothing to explain.
-      const isYouTubeRow = isYouTubeDomain(item.domain);
-      const why = isYouTubeRow ? explainDomainToday(item.domain, sites, today) : null;
-
-      html += `
+      return `
         <tr>
-          <td style="font-weight:700;" title="${item.domain}">${displayName}</td>
-          <td>${catSelectHtml}</td>
+          <td><span class="audit-site">${esc(name)}</span><span class="audit-domain">${esc(item.domain)}</span></td>
           <td>
-            <div style="font-weight:700; font-family:var(--mono); color:var(--text-primary);">${fmtDuration(item.seconds)}</div>
-            <div style="font-size:10.5px; color:var(--text-faint); margin-top:2px;">${item.pctOfTotal}% of session</div>
+            <div class="audit-cat">
+              <span class="cat-dot ${catClass(macro)}" title="${esc(MACRO_CATEGORIES[macro]?.label || macro)}"></span>
+              <select class="audit-cat-select" data-domain="${esc(item.domain)}" aria-label="Category for ${esc(name)}">${options}</select>
+            </div>
           </td>
-          <td>${statusBadge}</td>
-          <td style="text-align:right;">
-            ${why ? `<button class="btn-ghost btn-compact why-toggle-btn" type="button" data-why-for="${item.domain}">Why?</button>` : ""}
-            <button class="btn-ghost audit-action-btn" data-domain="${item.domain}" style="padding:5px 10px; font-size:11px; font-weight:600;">
-              ${item.mode === "unconstrained" ? "+ Limit" : "Edit Rule"}
-            </button>
+          <td class="num">${fmtDuration(item.seconds)}<span class="num-sub">${item.pctOfTotal}%</span></td>
+          <td>${ruleTag(item.entry) || `<span class="panel-meta">No rule</span>`}</td>
+          <td class="col-actions">
+            ${why ? `<button class="btn-ghost btn-compact why-toggle-btn" type="button" data-why-for="${esc(item.domain)}">Why?</button>` : ""}
+            <button class="btn-ghost btn-compact audit-action-btn" type="button" data-domain="${esc(item.domain)}">${entryHasRule(item.entry) ? "Edit rule" : "Add rule"}</button>
           </td>
         </tr>
         ${why ? `
-          <tr class="why-panel-row" data-why-panel="${item.domain}" hidden>
+          <tr class="why-panel-row" data-why-panel="${esc(item.domain)}" hidden>
             <td colspan="5">
               <div class="why-panel">
-                <p class="why-sentence">${why.sentence}</p>
-                <button class="btn-ghost btn-compact why-classify-btn" type="button" data-channel-id="${why.channelId || ""}" data-channel-name="${why.channelName || ""}" data-macro="${why.macro}" data-micro="${why.micro}">Classify this channel</button>
+                <p class="why-sentence">${esc(why.sentence)}</p>
+                <button class="btn-ghost btn-compact why-classify-btn" type="button" data-channel-id="${esc(why.channelId || "")}" data-channel-name="${esc(why.channelName || "")}" data-macro="${esc(why.macro)}" data-micro="${esc(why.micro)}">Classify this channel</button>
               </div>
             </td>
-          </tr>
-        ` : ""}
-      `;
-    });
+          </tr>` : ""}`;
+    }).join("");
 
-    html += `</tbody></table>`;
-    optDomainAuditTable.innerHTML = html;
+    optDomainAuditTable.innerHTML = `
+      <table class="table">
+        <thead><tr><th>Site</th><th>Category</th><th class="num">Today</th><th>Rule</th><th class="col-actions"></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
 
     optDomainAuditTable.querySelectorAll(".audit-cat-select").forEach((select) => {
       select.addEventListener("change", async (e) => {
         const domain = e.target.dataset.domain;
         const selectedMicro = e.target.value;
-
         if (selectedMicro === "__custom__") {
           openCustomCategoryModal(domain);
           return;
         }
-
         await applyDomainCategory(domain, selectedMicro, MICRO_TO_MACRO[selectedMicro] || "General");
       });
     });
 
     wireWhyControls(optDomainAuditTable);
-
     optDomainAuditTable.querySelectorAll(".audit-action-btn").forEach((btn) => {
       btn.addEventListener("click", () => openModal(btn.dataset.domain));
     });
   }
 
-  function renderDisciplines(moderation) {
+  const STATUS_ORDER = { suspended: 0, active: 1, off: 2 };
+
+  function ruleRowHtml(domain, entry) {
+    const name = getDomainDisplayName(domain);
+    const now = new Date();
+    const today = todayStr();
+    const todayKey = dateKey(now);
+    const status = ruleStatus(entry, now);
+    const trips = tripsForDate(entry, today, today);
+    const usedSec = usageSecondsForDate(entry, today, today);
+    const streak = progState && progState.streaks.rules && progState.streaks.rules[domain];
+
+    let statusCls = status.state;
+    let statusText = status.text;
+
+    let todayHtml;
+    const pos = entry.mode === "limit" ? limitPosition(entry, now) : null;
+    if (pos && pos.limitMin) {
+      if (status.state === "active" && pos.spent) { statusCls = "spent"; statusText = "Spent for today"; }
+      todayHtml = `
+        <div class="rule-today-line">
+          <span class="rule-today-value">${fmtDuration(pos.usedSec)} <span>of ${pos.limitMin}m</span></span>
+          <span class="rule-today-meta">${pos.spent ? "None left" : `${fmtMinutes(pos.limitMin - pos.usedSec / 60)} left`}</span>
+        </div>
+        <div class="rule-bar"><div class="rule-bar-fill ${pos.cls}" style="width:${pos.pct}%"></div></div>
+        <span class="rule-today-meta">Stopped ${trips}× today</span>`;
+    } else {
+      todayHtml = `
+        <div class="rule-today-line">
+          <span class="rule-today-value">${trips}× <span>stopped today</span></span>
+        </div>
+        <span class="rule-today-meta">${usedSec > 0 ? `${fmtDuration(usedSec)} on the site today` : "No time on the site today"}</span>
+        <span class="rule-today-meta">${entry.timesTripped || 0}× all time</span>`;
+    }
+
+    // Seven small bars: minutes against the limit for a daily limit,
+    // times stopped for the other two.
+    const week = trailingWeekUsage(entry, now);
+    const values = week.map((d) => (pos ? d.seconds : tripsForDate(entry, d.date, todayKey)));
+    const scale = Math.max(1, ...values, pos ? (pos.limitMin || 0) * 60 : 0);
+    const bars = week.map((d, i) => {
+      let cls = "";
+      if (!d.scheduled) cls = "is-off";
+      else if (pos && d.limitMinutes) cls = d.seconds > d.limitMinutes * 60 + 30 ? "is-over" : d.seconds > 0 ? "is-kept" : "";
+      const h = values[i] > 0 ? Math.max(8, Math.round((values[i] / scale) * 100)) : 0;
+      const tip = pos ? `${d.date}: ${fmtDuration(d.seconds)}` : `${d.date}: stopped ${values[i]}×`;
+      return `<div class="rule-week-bar ${cls}" style="height:${cls === "is-off" ? 100 : h}%" title="${tip}"></div>`;
+    }).join("");
+    const labels = week.map((d) => `<span>${d.label.charAt(0)}</span>`).join("");
+
+    const suspended = status.state === "suspended";
+    return `
+      <article class="rule${suspended ? " is-suspended" : ""}${status.state === "off" ? " is-off" : ""}" data-domain="${esc(domain)}">
+        <div class="rule-id">
+          <span class="avatar">${monogram(name)}</span>
+          <div class="rule-id-text">
+            <h3 class="rule-name">${esc(name)}</h3>
+            <span class="rule-domain">${esc(domain)}</span>
+            <div class="rule-what">
+              <span class="tag tag-${entry.mode}">${MODE_LABELS[entry.mode]}</span>
+              <span class="rule-sched">${esc(scheduleSummary(entry))}</span>
+            </div>
+            <span class="status status-${statusCls}">${esc(statusText)}${streak && streak.current > 0 ? ` · kept ${streak.current} day${streak.current === 1 ? "" : "s"}` : ""}</span>
+          </div>
+        </div>
+        <div class="rule-today">${todayHtml}</div>
+        <div class="rule-week">
+          <div class="rule-week-bars">${bars}</div>
+          <div class="rule-week-labels">${labels}</div>
+          <span class="rule-week-caption">${pos ? "Last 7 days against the limit" : "Times stopped, last 7 days"}</span>
+        </div>
+        <div class="rule-actions">
+          <button class="btn-ghost edit-btn" type="button">Edit</button>
+          <button class="btn-ghost pause-btn" type="button">${suspended ? "Resume" : "Suspend"}</button>
+          <button class="btn-ghost btn-ghost-danger delete-btn" type="button">Delete</button>
+        </div>
+        <div class="rule-suspend" hidden>
+          <span>Suspend for</span>
+          ${SUSPEND_OPTIONS.map((o) => `<button class="btn-ghost suspend-opt" type="button" data-option="${o.id}">${o.label}</button>`).join("")}
+          <button class="link-btn suspend-cancel" type="button">Cancel</button>
+        </div>
+      </article>`;
+  }
+
+  function renderDisciplines() {
     if (!optDisciplinesGrid) return;
-    const keys = Object.keys(sites).filter(
-      (d) => sites[d].mode === "limit" || sites[d].mode === "block" || sites[d].mode === "restraint"
-    );
+    const keys = Object.keys(sites).filter((d) => entryHasRule(sites[d]));
 
-    const filteredKeys = keys.filter((domain) => {
-      const entry = sites[domain];
-      if (activeFilter !== "all" && entry.mode !== activeFilter) return false;
-      if (searchQuery && !domain.toLowerCase().includes(searchQuery)) return false;
-      return true;
-    });
+    const summary = document.getElementById("optRulesSummary");
+    if (summary) {
+      const suspendedCount = keys.filter((d) => isRuleSuspended(sites[d])).length;
+      const today = todayStr();
+      const tripsToday = keys.reduce((sum, d) => sum + tripsForDate(sites[d], today, today), 0);
+      summary.textContent = keys.length
+        ? [
+            `${keys.length} rule${keys.length === 1 ? "" : "s"}`,
+            suspendedCount ? `${suspendedCount} suspended` : "",
+            `stopped you ${tripsToday}× today`,
+          ].filter(Boolean).join(" · ")
+        : "Everything you asked to be stopped from.";
+    }
 
-    optDisciplinesGrid.innerHTML = "";
+    const filtered = keys
+      .filter((domain) => {
+        const entry = sites[domain];
+        if (activeFilter !== "all" && entry.mode !== activeFilter) return false;
+        if (searchQuery && !domain.includes(searchQuery) && !getDomainDisplayName(domain).toLowerCase().includes(searchQuery)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const sa = STATUS_ORDER[ruleStatus(sites[a]).state];
+        const sb = STATUS_ORDER[ruleStatus(sites[b]).state];
+        return sa - sb || getDomainDisplayName(a).localeCompare(getDomainDisplayName(b));
+      });
 
-    if (filteredKeys.length === 0) {
+    const emptyTitle = document.getElementById("optEmptyTitle");
+    const emptyBody = document.getElementById("optEmptyBody");
+    if (filtered.length === 0) {
+      optDisciplinesGrid.innerHTML = "";
       optDisciplinesGrid.hidden = true;
       if (optEmptyState) optEmptyState.hidden = false;
-    } else {
-      optDisciplinesGrid.hidden = false;
-      if (optEmptyState) optEmptyState.hidden = true;
+      if (keys.length > 0) {
+        if (emptyTitle) emptyTitle.textContent = "No rules match";
+        if (emptyBody) emptyBody.textContent = "Try a different search or filter.";
+        if (optCreateFirstBtn) optCreateFirstBtn.hidden = true;
+      } else {
+        if (emptyTitle) emptyTitle.textContent = "No rules yet";
+        if (emptyBody) emptyBody.textContent = "A rule is how you ask to be stopped. Start with the one site that takes the most of your day.";
+        if (optCreateFirstBtn) optCreateFirstBtn.hidden = false;
+      }
+      return;
+    }
 
-      filteredKeys.forEach((domain) => {
-        const entry = sites[domain];
-        const displayName = getDomainDisplayName(domain);
-        const card = document.createElement("div");
-        card.className = "discipline-card";
+    optDisciplinesGrid.hidden = false;
+    if (optEmptyState) optEmptyState.hidden = true;
+    optDisciplinesGrid.innerHTML = filtered.map((domain) => ruleRowHtml(domain, sites[domain])).join("");
 
-        const isBlock = entry.mode === "block";
-        const isRestraint = entry.mode === "restraint";
-        let badgeText = "Time Limit";
-        if (isBlock) badgeText = "Full Block";
-        else if (isRestraint) badgeText = "Restraint Mode";
+    optDisciplinesGrid.querySelectorAll(".rule").forEach((card) => {
+      const domain = card.dataset.domain;
+      const entry = sites[domain];
+      const displayName = getDomainDisplayName(domain);
+      const suspendRow = card.querySelector(".rule-suspend");
 
-        let ruleText = `${entry.limitMinutes || 30} min/day`;
-        if (isBlock) ruleText = "Blocked full day";
-        else if (isRestraint) ruleText = "60s wait + puzzle + written reason";
+      card.querySelector(".edit-btn").addEventListener("click", () => openModal(domain));
 
-        const dayLimits = normalizeSchedule(entry.schedule).dayLimits;
-        const exceptionDays = Object.keys(dayLimits).sort((a, b) => Number(a) - Number(b));
-        if (exceptionDays.length) {
-          const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-          const parts = exceptionDays.map((d) => `${dayLimits[d]}m ${DAY_ABBR[Number(d)]}`);
-          ruleText += ` (except ${parts.join(", ")})`;
-        }
-
-        const rule = getActiveRule(entry);
-        const usedSec = usageSecondsForDate(entry, todayStr());
-        const usedTodayStr = fmtMinutes(usedSec / 60);
-        const limitSec = (entry.limitMinutes || 30) * 60;
-        const usedPct = isBlock ? 100 : (isRestraint ? 0 : Math.min(100, Math.round((usedSec / limitSec) * 100)));
-        const streak = limitStreakDays(entry);
-
-        let progressColor = "var(--held)";
-        if (usedPct >= 100) progressColor = "var(--missed)";
-        else if (usedPct >= 75) progressColor = "var(--partial)";
-        const taxonomy = getDomainTaxonomy(domain, sites);
-
-        card.innerHTML = `
-          <div>
-            <div class="discipline-card-header">
-              <span class="discipline-domain" title="${domain}">${displayName}</span>
-              <span class="discipline-badge mode-${entry.mode}">${badgeText}</span>
-            </div>
-            <div class="discipline-meta" style="margin-top: 10px;">
-              <div><strong>Hierarchy:</strong> <span class="macro-badge macro-${taxonomy.macro.toLowerCase()}">${taxonomy.macro}</span> <span class="micro-badge">${taxonomy.micro}</span></div>
-              <div><strong>Rule:</strong> ${ruleText}</div>
-              <div><strong>Tracked Today:</strong> ${usedTodayStr}</div>
-              <div><strong>Times Tripped:</strong> ${entry.timesTripped || 0}×</div>
-              ${streak > 0 ? `<div><strong>Streak:</strong> <span style="color:var(--text-primary); font-weight:700;">${streak} day${streak === 1 ? "" : "s"}</span></div>` : ""}
-              <div><strong>Status:</strong> ${entry.paused ? "Paused" : rule.active ? "Active" : "Off-schedule"}</div>
-            </div>
-            ${!isBlock && !isRestraint ? `
-              <div class="cat-progress-bg" style="margin-top: 10px;">
-                <div class="cat-progress-fill" style="width:${usedPct}%; background:${progressColor};"></div>
-              </div>
-            ` : ""}
-          </div>
-          <div class="discipline-card-actions">
-            <button class="btn-ghost edit-btn" type="button">Edit</button>
-            <button class="btn-ghost pause-btn" type="button">${entry.paused ? "Resume" : "Pause"}</button>
-            <button class="btn-ghost delete-btn" type="button" style="color:var(--error); border-color:var(--error-border);">Delete</button>
-          </div>
-        `;
-
-        card.querySelector(".edit-btn").addEventListener("click", () => openModal(domain));
-        card.querySelector(".pause-btn").addEventListener("click", async () => {
-          const pausing = !entry.paused;
-          if (pausing) {
-            const proceed = await requestFrictionGate({
-              title: `Pause restriction on ${displayName}?`,
-              copy: "Pausing turns this rule off just as completely as deleting it would, for as long as you leave it paused. Same gate applies.",
-            });
-            if (!proceed) return;
-          }
-          entry.paused = pausing;
+      card.querySelector(".pause-btn").addEventListener("click", async () => {
+        if (isRuleSuspended(entry)) {
+          // Resuming tightens, so it is free.
+          resumeRule(entry);
           await saveSites(sites);
           renderAll();
-        });
-        card.querySelector(".delete-btn").addEventListener("click", async () => {
+          return;
+        }
+        suspendRow.hidden = !suspendRow.hidden;
+      });
+      card.querySelector(".suspend-cancel").addEventListener("click", () => { suspendRow.hidden = true; });
+      card.querySelectorAll(".suspend-opt").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const option = SUSPEND_OPTIONS.find((o) => o.id === btn.dataset.option);
           const proceed = await requestFrictionGate({
-            title: `Remove moderation rule for ${displayName}?`,
-            copy: `You installed this rule for a reason. Deleting it removes ${displayName} from Stoic entirely — no limit, no restraint, no block.`,
+            title: `Suspend ${displayName} for ${option.label.toLowerCase()}?`,
+            copy: "While it's suspended this rule does nothing, exactly as if you'd deleted it. It comes back on its own when the time is up.",
           });
           if (!proceed) return;
-          delete sites[domain];
+          suspendRule(entry, option.id);
           await saveSites(sites);
-          await sendProgressionEvent("rule_deleted", { domain });
           renderAll();
         });
-
-        optDisciplinesGrid.appendChild(card);
       });
-    }
 
-    // Streaks List
-    if (optStreaksList) {
-      optStreaksList.innerHTML = "";
-      if (keys.length === 0) {
-        optStreaksList.innerHTML = emptyState(
-          "No rules yet",
-          "Rules you set will appear here with how many days in a row you have kept each one."
-        );
-        return;
-      }
-
-      keys.forEach((domain) => {
-        const entry = sites[domain];
-        const displayName = getDomainDisplayName(domain);
-        const streak = limitStreakDays(entry);
-        const row = document.createElement("div");
-        row.className = "streak-item";
-        row.innerHTML = `
-          <span class="streak-domain" title="${domain}">${displayName}</span>
-          <span class="streak-badge">${streak} day${streak === 1 ? "" : "s"} streak</span>
-        `;
-        optStreaksList.appendChild(row);
+      card.querySelector(".delete-btn").addEventListener("click", async () => {
+        const proceed = await requestFrictionGate({
+          title: `Delete the rule for ${displayName}?`,
+          copy: `You set this rule up for a reason. Deleting it removes every limit on ${displayName}.`,
+        });
+        if (!proceed) return;
+        // Keep the time history; only the rule goes.
+        const { mode, limitMinutes, schedule, action, redirectUrl, paused, pausedUntil, ...rest } = entry;
+        sites[domain] = { ...rest, mode: "unconstrained" };
+        await saveSites(sites);
+        await sendProgressionEvent("rule_deleted", { domain });
+        renderAll();
       });
-    }
+    });
   }
 
   // Modal logic
+  function setModalAction(action, redirectUrl) {
+    modalAction = action === "redirect" ? "redirect" : "page";
+    optModalActionSeg.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-value") === modalAction);
+    });
+    optModalRedirect.hidden = modalAction !== "redirect";
+    if (redirectUrl !== undefined) optModalRedirect.value = redirectUrl || "";
+    optModalRedirectError.style.display = "none";
+  }
+
+  function syncModalModeRows() {
+    optModalLimitRow.hidden = modalMode !== "limit";
+    if (optModalRestraintRow) optModalRestraintRow.hidden = modalMode !== "restraint";
+    // The pause always shows Stoic's page — sending someone elsewhere
+    // would skip the pause entirely.
+    optModalActionRow.hidden = modalMode === "restraint";
+  }
+
   function openModal(domainKey = null) {
     editingDomainKey = domainKey;
+    const editingEntry = domainKey && sites[domainKey];
+    setModalAction(editingEntry && editingEntry.action, (editingEntry && editingEntry.redirectUrl) || "");
     optModalDomainError.style.display = "none";
     optModalDomainError.textContent = "";
 
     if (domainKey && sites[domainKey]) {
       const entry = sites[domainKey];
       const displayName = getDomainDisplayName(domainKey);
-      optModalTitle.textContent = `Configure Rule · ${displayName}`;
+      optModalTitle.textContent = `Edit rule · ${displayName}`;
       optModalDomain.value = domainKey;
       optModalDomain.disabled = true;
       modalMode = entry.mode === "unconstrained" ? "limit" : entry.mode;
@@ -1067,7 +1128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       exceptionMinutes = { ...schedule.dayLimits };
     } else {
-      optModalTitle.textContent = "New Moderation Rule";
+      optModalTitle.textContent = "New rule";
       optModalDomain.value = "";
       optModalDomain.disabled = false;
       modalMode = "limit";
@@ -1088,8 +1149,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isMatch = btn.getAttribute("data-value") === modalMode;
       btn.classList.toggle("active", isMatch);
     });
-    optModalLimitRow.hidden = modalMode !== "limit";
-    if (optModalRestraintRow) optModalRestraintRow.hidden = modalMode !== "restraint";
+    syncModalModeRows();
 
     optModal.showModal();
   }
@@ -1130,6 +1190,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     const limitMin = Number(optModalMinutes.value) || 30;
     const existing = sites[rawDomain] || {};
 
+    let redirectUrl = "";
+    if (modalAction === "redirect" && modalMode !== "restraint") {
+      redirectUrl = optModalRedirect.value.trim();
+      if (redirectUrl && !/^https?:\/\//i.test(redirectUrl)) redirectUrl = `https://${redirectUrl}`;
+      let valid = false;
+      try { valid = !!new URL(redirectUrl).hostname; } catch { valid = false; }
+      if (!valid) {
+        optModalRedirectError.textContent = "Enter the address to send you to, like todoist.com.";
+        optModalRedirectError.style.display = "block";
+        return;
+      }
+    }
+
     const updatedEntry = {
       ...existing,
       mode: modalMode,
@@ -1140,6 +1213,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         endTime: optModalEndTime.value || "",
         dayLimits: { ...exceptionMinutes },
       },
+      action: redirectUrl ? "redirect" : "page",
+      redirectUrl,
       createdAt: existing.createdAt || todayStr(),
     };
 
@@ -1237,7 +1312,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           const oldEntry = sites[domain];
           if (!oldEntry || (oldEntry.mode !== "restraint" && oldEntry.mode !== "block")) return false;
           const newEntry = payload.sites[domain] || { mode: "unconstrained" };
-          return isLoosening(oldEntry, newEntry) || (!oldEntry.paused && newEntry.paused);
+          return isLoosening(oldEntry, newEntry) || (!isRuleSuspended(oldEntry) && isRuleSuspended(newEntry));
         });
 
         if (wouldLoosen) {
@@ -1482,7 +1557,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (resetChannelDbBtn) {
     resetChannelDbBtn.addEventListener("click", async () => {
-      if (confirm("Clear every YouTube channel classification, including the ones you set by hand?")) {
+      if (confirm("Forget every channel classification, including the ones you set yourself?")) {
         await clearChannelStore();
         await loadData();
       }
@@ -1493,61 +1568,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     addChannelBtn.addEventListener("click", () => openClassifyModal({ kind: "channel" }));
   }
 
-  const SOURCE_BADGES = {
-    manual: { label: "EXPLICIT", color: "#a855f7", tint: "rgba(168, 85, 247, 0.12)" },
-    builtin: { label: "BUILT-IN", color: "#0d9488", tint: "rgba(13, 148, 136, 0.12)" },
-    predicted: { label: "PREDICTED", color: "var(--waived-soft)", tint: "var(--waived-dim)" },
-    unclassified: { label: "UNRESOLVED", color: "var(--partial-soft)", tint: "var(--partial-dim)" },
+  const SOURCE_LABELS = {
+    manual: "You",
+    builtin: "Built in",
+    predicted: "Predicted",
+    unclassified: "Undecided",
   };
 
-  function sourceBadgeHtml(source) {
-    const badge = SOURCE_BADGES[source] || SOURCE_BADGES.predicted;
-    return `<span class="micro-badge" style="background:${badge.tint}; color:${badge.color}; border-color:${badge.tint};">${badge.label}</span>`;
-  }
-
-  // Channel database — the one piece of the old debugger tab that survives
-  // (audit R4: "they are rules about what counts as what"), moved under
-  // Rules and stripped of the internal-vocabulary framing.
+  // Channel classifications — the one piece of the old debugger that
+  // survives (audit R4), in plain words.
   function renderChannelsTable() {
-    const channelsTableBody = document.getElementById("channelsTableBody");
-    if (!channelsTableBody) return;
-    channelsTableBody.innerHTML = "";
+    const body = document.getElementById("channelsTableBody");
+    if (!body) return;
     const channels = listChannels();
+    const countEl = document.getElementById("ytChannelCount");
+    if (countEl) countEl.textContent = channels.length ? `${channels.length} channel${channels.length === 1 ? "" : "s"}` : "";
 
     if (channels.length === 0) {
-      channelsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-faint); padding: 16px;">No channel classifications stored yet. Watch a YouTube video, or use “+ Add / Classify Channel”.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="4">${emptyState("No channels yet", "Channels appear here as you watch YouTube, or classify one yourself.")}</td></tr>`;
       return;
     }
 
-    channels.forEach((channel) => {
+    body.innerHTML = channels.map((channel, i) => {
       const cls = channel.classification || { macro: "General", micro: "Unclassified" };
-      const row = document.createElement("tr");
-      const confPct = Math.round((channel.confidence ?? 0.9) * 100);
-      const dateStr = channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : "--";
       const macroLabel = MACRO_CATEGORIES[cls.macro]?.label || cls.macro;
+      const source = SOURCE_LABELS[channel.source] || SOURCE_LABELS.predicted;
+      const conf = channel.source === "predicted" ? ` · ${Math.round((channel.confidence ?? 0) * 100)}% sure` : "";
+      return `
+        <tr data-index="${i}">
+          <td><span class="audit-site">${esc(channel.channelName || channel.channelId)}</span><span class="audit-domain">${esc(channel.channelId || "")}</span></td>
+          <td><div class="audit-cat"><span class="cat-dot ${catClass(cls.macro)}"></span>${esc(macroLabel)} · ${esc(cls.micro)}</div></td>
+          <td><span class="source-tag">${source}${conf}</span>${channel.reason ? `<span class="source-reason">${esc(channel.reason)}</span>` : ""}</td>
+          <td class="col-actions">
+            <button class="btn-ghost btn-compact edit-ch-btn" type="button">Classify</button>
+            ${channel.source === "manual" || channel.pinned ? "" : `<button class="btn-ghost btn-compact reclass-ch-btn" type="button" title="Ask the predictor again">Re-predict</button>`}
+            <button class="btn-ghost btn-compact btn-ghost-danger del-ch-btn" type="button" title="Forget this and let prediction decide">Forget</button>
+          </td>
+        </tr>`;
+    }).join("");
 
-      row.innerHTML = `
-        <td>
-          <div style="font-weight: 700;">${channel.channelName || channel.channelId}</div>
-          <div style="font-size: 11px; color: var(--text-faint); font-family: var(--mono);">${channel.channelId}</div>
-        </td>
-        <td>
-          <span class="macro-badge macro-${cls.macro.toLowerCase()}">${macroLabel}</span>
-          <span class="micro-badge">${cls.micro}</span>
-        </td>
-        <td>
-          <div>${sourceBadgeHtml(channel.source)}${channel.pinned ? ` <span class="micro-badge" title="Explicit classifications are final — prediction never overwrites them.">PINNED</span>` : ""}</div>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 240px; word-break: break-word;">${channel.reason || "--"}</div>
-        </td>
-        <td><span style="font-family: var(--mono); font-weight: 700;">${confPct}%</span></td>
-        <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
-        <td>
-          <button class="btn-ghost edit-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Set this channel's category permanently">Classify</button>
-          <button class="btn-ghost reclass-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px;" title="Run the prediction system again for this channel">Re-predict</button>
-          <button class="btn-ghost del-ch-btn" type="button" style="padding: 4px 8px; font-size: 11px; color: var(--missed);" title="Forget this classification and let prediction decide again">Reset</button>
-        </td>
-      `;
-
+    body.querySelectorAll("tr[data-index]").forEach((row) => {
+      const channel = channels[Number(row.dataset.index)];
+      const cls = channel.classification || { macro: "General", micro: "Unclassified" };
       row.querySelector(".edit-ch-btn").addEventListener("click", () =>
         openClassifyModal({
           kind: "channel",
@@ -1558,34 +1620,64 @@ document.addEventListener("DOMContentLoaded", async () => {
           micro: cls.micro,
         })
       );
-
       const reclassBtn = row.querySelector(".reclass-ch-btn");
-      reclassBtn.addEventListener("click", async () => {
-        reclassBtn.disabled = true;
-        reclassBtn.textContent = "Predicting...";
-        try {
-          await predictChannelClassification(
-            { channelId: channel.channelId, channelName: channel.channelName },
-            { forceReclassify: true }
-          );
-          await loadData();
-        } catch (err) {
-          alert("Re-prediction failed: " + err.message);
-          reclassBtn.disabled = false;
-          reclassBtn.textContent = "Re-predict";
-        }
-      });
-
+      if (reclassBtn) {
+        reclassBtn.addEventListener("click", async () => {
+          reclassBtn.disabled = true;
+          reclassBtn.textContent = "Predicting…";
+          try {
+            await predictChannelClassification(
+              { channelId: channel.channelId, channelName: channel.channelName },
+              { forceReclassify: true }
+            );
+            await loadData();
+          } catch (err) {
+            alert("Prediction failed: " + err.message);
+            reclassBtn.disabled = false;
+            reclassBtn.textContent = "Re-predict";
+          }
+        });
+      }
       row.querySelector(".del-ch-btn").addEventListener("click", async () => {
-        if (confirm(`Forget the classification for ${channel.channelName || channel.channelId}?`)) {
+        if (confirm(`Forget how ${channel.channelName || channel.channelId} is classified?`)) {
           await unpinChannel({ channelId: channel.channelId, channelName: channel.channelName });
           await loadData();
         }
       });
-
-      channelsTableBody.appendChild(row);
     });
   }
+
+  document.querySelectorAll("[data-goto]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = tabs.find((t) => t.getAttribute("data-target") === btn.dataset.goto);
+      if (tab) selectTab(tab, { focus: true });
+    });
+  });
+
+  // Live: the page used to show whatever was true when it was opened.
+  // Re-read when the worker writes, but never under an open dialog or a
+  // field being edited, and at most twice a second.
+  let reloadTimer = null;
+  function scheduleReload() {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => {
+      const editing = document.querySelector("dialog[open]") ||
+        (document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
+        (optDisciplinesGrid && optDisciplinesGrid.querySelector(".rule-suspend:not([hidden])"));
+      if (editing) {
+        scheduleReload();
+        return;
+      }
+      loadData();
+    }, 500);
+  }
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if ((area === "local" || area === "sync") && (changes.sites || changes.progression)) scheduleReload();
+    });
+  }
+  // Countdowns ("back at 3:40", "12m left") move with the clock.
+  setInterval(() => { if (!document.hidden) scheduleReload(); }, 30000);
 
   loadData();
 });

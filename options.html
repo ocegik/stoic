@@ -10,361 +10,284 @@
 <link rel="stylesheet" href="options.css" />
 </head>
 <body>
-<div class="options-container">
+<div class="shell">
 
-  <!-- Header -->
-  <header class="options-header">
-    <div class="header-brand">
-      <div class="brand-mark">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3H18V5.4H13.8V18.6H18V21H6V18.6H10.2V5.4H6Z"/></svg>
-      </div>
-      <div>
-        <h1 class="header-title">Stoic</h1>
-        <p class="header-subtitle">Where your attention went, and what you asked to be stopped from.</p>
-      </div>
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 3H18V5.4H13.8V18.6H18V21H6V18.6H10.2V5.4H6Z"/></svg>
+      </span>
+      <span class="topbar-title">Stoic</span>
     </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="nav-tab active" data-target="tab-today" role="tab" aria-selected="true">Today</button>
+      <button class="nav-tab" data-target="tab-record" role="tab" aria-selected="false">Record</button>
+      <button class="nav-tab" data-target="tab-rules" role="tab" aria-selected="false">Rules</button>
+      <button class="nav-tab" data-target="tab-settings" role="tab" aria-selected="false">Settings</button>
+    </nav>
   </header>
 
-  <!-- Navigation Tabs -->
-  <nav class="options-nav" role="tablist">
-    <button class="nav-tab active" data-target="tab-today" role="tab" aria-selected="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Today
-    </button>
-    <button class="nav-tab" data-target="tab-record" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg>
-      Record
-    </button>
-    <button class="nav-tab" data-target="tab-rules" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Rules
-    </button>
-    <button class="nav-tab" data-target="tab-settings" role="tab" aria-selected="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Settings
-    </button>
-  </nav>
+  <main class="page">
 
-  <!-- Main Content Sections -->
-  <main class="options-main">
-
-    <!-- TAB 1: TODAY (was Overview + Progress's "today's standing") -->
+    <!-- ============ TODAY ============ -->
     <section class="tab-panel active" id="tab-today" role="tabpanel">
-
-      <!-- HERO SECTION: Visual Anchor & Focus Score Component -->
-      <div class="hero-anchor-section">
-        <div class="hero-primary">
-          <div class="hero-primary-val" id="optTodayTotal">0m</div>
-          <div class="hero-primary-lbl">Tracked today</div>
-        </div>
-
-        <!-- Focus Score Component -->
-        <div class="focus-score-component">
-          <div class="focus-gauge-box">
-            <svg class="focus-gauge-svg" viewBox="0 0 36 36">
-              <path class="focus-gauge-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path class="focus-gauge-fill" id="optFocusGaugePath" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            </svg>
-            <span class="focus-gauge-val" id="optFocusScore">100%</span>
-          </div>
-          <div class="focus-score-info">
-            <div class="focus-score-title">Focus Score</div>
-            <div class="focus-score-sub" id="optFocusScoreSub">—</div>
-          </div>
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Today</h1>
+          <p class="page-sub" id="optTodayDate"></p>
         </div>
       </div>
 
-      <!-- TOP WEBSITES SECTION (Part 4 Compact Rows) -->
-      <div class="overview-section">
-        <h2 class="overview-section-title">Where today went</h2>
-        <div class="top-websites-list" id="optTopWebsitesList"></div>
-      </div>
-
-      <div class="overview-section">
-        <h2 class="overview-section-title">Today's standing</h2>
-        <div class="card card-secondary" id="progStandingContainer"></div>
-      </div>
-
-      <!-- BEHAVIOUR SUMMARY SECTION (Part 4 Compact Metrics Row) -->
-      <div class="overview-section">
-        <h2 class="overview-section-title">The two numbers worth carrying</h2>
-        <div class="overview-behaviour-row">
-          <div class="compact-metric-item">
-            <span class="compact-metric-val" id="optOverviewRefusals">0</span>
-            <span class="compact-metric-lbl">Times you turned back, all time</span>
-          </div>
-          <div class="compact-metric-item">
-            <span class="compact-metric-val" id="optOverviewRulesActive">0</span>
-            <span class="compact-metric-lbl">Rules standing</span>
-          </div>
-          <div class="compact-metric-item">
-            <span class="compact-metric-val" id="optOverviewTrippedCount">0</span>
-            <span class="compact-metric-lbl">Times a rule stopped you today</span>
-          </div>
+      <div class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Tracked</span>
+          <span class="kpi-value" id="optTodayTotal">—</span>
+          <span class="kpi-sub" id="optTodayVsAvg"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Focus score</span>
+          <span class="kpi-value" id="optFocusScore">—</span>
+          <div class="meter"><div class="meter-fill" id="optFocusMeter"></div></div>
+          <span class="kpi-sub" id="optFocusScoreSub"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Stopped by a rule</span>
+          <span class="kpi-value" id="optOverviewTrippedCount">—</span>
+          <span class="kpi-sub">today</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">Turned back</span>
+          <span class="kpi-value" id="optOverviewRefusals">—</span>
+          <span class="kpi-sub">all time</span>
         </div>
       </div>
 
+      <div class="cols cols-wide-left">
+        <section class="panel">
+          <header class="panel-head">
+            <h2 class="panel-title">Where today went</h2>
+            <span class="panel-meta" id="optSitesCount"></span>
+          </header>
+          <div class="site-list" id="optTopWebsitesList"></div>
+        </section>
+
+        <div class="stack">
+          <section class="panel">
+            <header class="panel-head"><h2 class="panel-title">Today's standard</h2></header>
+            <div id="progStandingContainer"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2 class="panel-title">Rules right now</h2>
+              <button class="link-btn" type="button" data-goto="tab-rules">Manage</button>
+            </header>
+            <div class="now-list" id="optRulesNow"></div>
+          </section>
+        </div>
+      </div>
     </section>
 
-
-    <!-- TAB 2: RECORD (was Progress minus today's standing, + Detailed
-         Analysis + Categories). Composition/hero promotion is Phase 3 —
-         this pass only relocates the panels. -->
+    <!-- ============ RECORD ============ -->
     <section class="tab-panel" id="tab-record" role="tabpanel" hidden>
-      <div class="dashboard-section">
-        <div id="progLevelUpBannerOptions"></div>
-
-        <h2 class="section-title">Identity</h2>
-        <div class="card" id="progIdentityContainer"></div>
-
-        <h2 class="section-title">Streaks</h2>
-        <div class="card card-secondary" id="progStreaksContainer"></div>
-
-        <h2 class="section-title">Contribution grid</h2>
-        <div class="card card-secondary" id="progGridContainer"></div>
-
-        <h2 class="section-title">Personal records</h2>
-        <div class="card card-secondary" id="progRecordsContainer"></div>
-
-        <h2 class="section-title">Achievements</h2>
-        <div class="card card-secondary" id="progAchievementsContainer"></div>
-
-        <h2 class="section-title">Lifetime statistics</h2>
-        <div class="card card-secondary" id="progLifetimeContainer"></div>
-
-        <h2 class="section-title">Session Insights & Distribution</h2>
-
-        <!-- Today's AI Insight Card -->
-        <div class="card">
-          <div class="insight-body">
-            <div class="insight-badge">Session Insight</div>
-            <div id="optInsightText" class="insight-text">Analyzing session activity...</div>
-          </div>
-        </div>
-
-        <!-- 7-Day Browsing Time Distribution -->
-        <div class="card card-secondary">
-          <div class="card-header-flex">
-            <div>
-              <h3>The last seven days</h3>
-              <p class="card-desc">How much time each day carried. No target, no trend line — just the week as it happened.</p>
-            </div>
-          </div>
-          <div class="analytics-chart" id="optAnalyticsChart"></div>
-        </div>
-
-        <h2 class="section-title">Browsing Activity Breakdown</h2>
-        <div class="card card-secondary">
-          <div class="card-header-flex">
-            <div>
-              <h3>How the day split</h3>
-              <p class="card-desc">Productive, general and leisure time, as classified today.</p>
-            </div>
-          </div>
-          <div class="category-grid" id="optCategoryGrid"></div>
-        </div>
-
-        <!-- Websites Visited Audit Table -->
-        <div class="card card-secondary">
-          <div class="card-header-flex">
-            <div>
-              <h3>Every site you visited today</h3>
-              <p class="card-desc">Everything tracked today, with a rule one click away.</p>
-            </div>
-          </div>
-          <div id="optDomainAuditTable" class="table-wrapper"></div>
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Your record</h1>
+          <p class="page-sub" id="optInsightText"></p>
         </div>
       </div>
+
+      <div id="progLevelUpBannerOptions" class="banner-slot"></div>
+
+      <section class="panel">
+        <div id="progIdentityContainer"></div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-head">
+          <h2 class="panel-title">The year, day by day</h2>
+          <span class="panel-meta">A day is held when every rule held, leisure stayed under the ceiling and focus met the target.</span>
+        </header>
+        <div id="progGridContainer"></div>
+      </section>
+
+      <div class="cols">
+        <section class="panel">
+          <header class="panel-head"><h2 class="panel-title">Streaks</h2></header>
+          <div id="progStreaksContainer"></div>
+        </section>
+        <section class="panel">
+          <header class="panel-head"><h2 class="panel-title">Personal records</h2></header>
+          <div id="progRecordsContainer"></div>
+        </section>
+      </div>
+
+      <div class="cols">
+        <section class="panel">
+          <header class="panel-head">
+            <h2 class="panel-title">Last seven days</h2>
+            <span class="panel-meta" id="optWeekTotal"></span>
+          </header>
+          <div class="week-chart" id="optAnalyticsChart"></div>
+        </section>
+        <section class="panel">
+          <header class="panel-head"><h2 class="panel-title">How today split</h2></header>
+          <div class="split" id="optCategoryGrid"></div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <header class="panel-head">
+          <h2 class="panel-title">Every site today</h2>
+          <span class="panel-meta">Change a category here and today's numbers update.</span>
+        </header>
+        <div id="optDomainAuditTable" class="table-wrapper"></div>
+      </section>
+
+      <section class="panel">
+        <div id="progAchievementsContainer"></div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-head"><h2 class="panel-title">Lifetime</h2></header>
+        <div id="progLifetimeContainer"></div>
+      </section>
     </section>
 
-
-    <!-- TAB 3: RULES (unchanged, plus the YouTube channel table — audit R4:
-         "they are rules about what counts as what") -->
+    <!-- ============ RULES ============ -->
     <section class="tab-panel" id="tab-rules" role="tabpanel" hidden>
-      <div class="dashboard-section">
-        <div class="panel-header">
-          <div>
-            <h2 class="section-title">Rules</h2>
-            <p class="panel-desc">Everything you have asked to be stopped from. Loosening any of these costs the same sixty seconds as pushing through one.</p>
-          </div>
-          <button class="btn-primary btn-accent" id="optAddSiteBtn" type="button">New rule</button>
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Rules</h1>
+          <p class="page-sub" id="optRulesSummary">Everything you asked to be stopped from.</p>
         </div>
+        <button class="btn-accent" id="optAddSiteBtn" type="button">New rule</button>
+      </div>
 
-        <!-- Moderation Performance Summary -->
-        <div class="card card-secondary">
-          <h3>How the rules held</h3>
-          <div class="mod-performance-grid">
-            <div class="perf-cell">
-              <div class="perf-val" id="optModLimitedCount">0</div>
-              <div class="perf-lbl">Rules standing</div>
-            </div>
-            <div class="perf-cell">
-              <div class="perf-val" id="optModTrippedCount">0</div>
-              <div class="perf-lbl">Times a rule stopped you today</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Rule Adherence Streaks -->
-        <div class="card">
-          <div class="card-header-flex">
-            <div>
-              <h3>Days in a row</h3>
-              <p class="card-desc">How long each rule has held without being broken.</p>
-            </div>
-          </div>
-          <div class="streaks-list" id="optStreaksList"></div>
-        </div>
-
-        <div class="filter-bar">
-          <input class="field search-field" id="siteSearchInput" placeholder="Filter moderation rules..." />
-          <div class="segmented filter-seg" id="filterModeSeg">
-            <button class="seg-btn active" data-filter="all">All Rules</button>
-            <button class="seg-btn" data-filter="limit">Time Limits</button>
-            <button class="seg-btn" data-filter="block">Full Blocks</button>
-          </div>
-        </div>
-
-        <div class="disciplines-grid" id="optDisciplinesGrid"></div>
-        <div class="empty-state" id="optEmptyState" hidden>
-          <p>No site moderation rules configured yet.</p>
-          <button class="btn-ghost" id="optCreateFirstBtn">Add your first moderation rule</button>
-        </div>
-
-        <!-- What counts as what on YouTube (moved from the deleted debugger
-             tab — audit R4/R5, Part 5.5). Only the channel table survives;
-             the live inspector, precedence trace and AI settings are gone. -->
-        <div class="panel-header mt-5">
-          <div>
-            <h2 class="section-title">What counts as what on YouTube</h2>
-            <p class="panel-desc">Stoic tells a lecture apart from a prank video, so a productive hour on YouTube is not filed as leisure. Channels you've classified here override everything else.</p>
-          </div>
-          <button class="btn-primary btn-accent" type="button" id="addChannelBtn">+ Add / Classify Channel</button>
-        </div>
-
-        <div class="card settings-card">
-          <div class="card-header-flex">
-            <div>
-              <h3>Channels you have classified</h3>
-              <p class="card-desc">Channels you have told Stoic what to count as.</p>
-            </div>
-            <button class="btn-ghost-danger" type="button" id="resetChannelDbBtn" title="Wipe all channel classifications">Clear Channel DB</button>
-          </div>
-          <div class="table-wrapper mt-4">
-            <table class="table" id="channelsTable">
-              <thead>
-                <tr>
-                  <th>Channel ID / Name</th>
-                  <th>Classification</th>
-                  <th>Authority & Rationale</th>
-                  <th>Confidence</th>
-                  <th>Last Updated</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="channelsTableBody">
-                <!-- Rendered dynamically -->
-              </tbody>
-            </table>
-          </div>
+      <div class="toolbar">
+        <input class="field search-field" id="siteSearchInput" type="search" placeholder="Find a rule" aria-label="Find a rule" />
+        <div class="segmented filter-seg" id="filterModeSeg">
+          <button class="seg-btn active" type="button" data-filter="all">All</button>
+          <button class="seg-btn" type="button" data-filter="limit">Daily limit</button>
+          <button class="seg-btn" type="button" data-filter="restraint">Pause first</button>
+          <button class="seg-btn" type="button" data-filter="block">Always closed</button>
         </div>
       </div>
+
+      <div class="rule-list" id="optDisciplinesGrid"></div>
+      <div class="empty-block" id="optEmptyState" hidden>
+        <p class="empty-block-title" id="optEmptyTitle">No rules yet</p>
+        <p class="empty-block-body" id="optEmptyBody">A rule is how you ask to be stopped. Start with the one site that takes the most of your day.</p>
+        <button class="btn-ghost" id="optCreateFirstBtn" type="button">Add a rule</button>
+      </div>
+
+      <p class="rules-note">Tightening a rule is free. Loosening, suspending or deleting one costs the same sixty seconds as pushing through it.</p>
+
+      <details class="panel disclosure-panel" id="ytPanel">
+        <summary class="panel-head">
+          <span>
+            <span class="panel-title">What counts as what on YouTube</span>
+            <span class="panel-meta" id="ytChannelCount"></span>
+          </span>
+        </summary>
+        <p class="panel-desc">Stoic tells a lecture apart from a prank video, so a productive hour on YouTube isn't filed as leisure. A channel you classify here always counts the way you said.</p>
+        <div class="panel-actions">
+          <button class="btn-ghost" type="button" id="addChannelBtn">Classify a channel</button>
+          <button class="btn-ghost btn-ghost-danger" type="button" id="resetChannelDbBtn">Forget all channels</button>
+        </div>
+        <div class="table-wrapper">
+          <table class="table" id="channelsTable">
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Counts as</th>
+                <th>Decided by</th>
+                <th class="col-actions"></th>
+              </tr>
+            </thead>
+            <tbody id="channelsTableBody"></tbody>
+          </table>
+        </div>
+      </details>
     </section>
 
-
-    <!-- TAB 4: SETTINGS (was Preferences + Backup + Danger Zone) -->
+    <!-- ============ SETTINGS ============ -->
     <section class="tab-panel" id="tab-settings" role="tabpanel" hidden>
-      <div class="dashboard-section">
-        <h2 class="section-title">Settings</h2>
+      <div class="page-head">
+        <div><h1 class="page-title">Settings</h1></div>
+      </div>
 
-        <div class="card settings-card">
-          <div class="settings-row-large">
-            <div class="settings-info">
-              <h3>Sync across your Chromes</h3>
-              <p>Keep your rules on every Chrome you are signed in to. Your time record always stays on this machine.</p>
-              <div class="sync-quota-badge">Chrome Sync Storage Limit: 8 KB per item</div>
-            </div>
-            <label class="switch" for="optSyncToggle">
-              <input type="checkbox" id="optSyncToggle" role="switch" aria-label="Toggle Chrome Sync" />
-              <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-            </label>
+      <section class="panel settings">
+        <h2 class="settings-group">General</h2>
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-name">Appearance</span>
+            <span class="setting-desc">Light, dark, or follow the system.</span>
           </div>
-          <div class="settings-note" id="optSyncNote" role="status" aria-live="polite" hidden></div>
-        </div>
-
-        <div class="card settings-card">
-          <h3>Appearance</h3>
-          <p class="card-desc">Light, dark, or whatever the system is set to. One palette, two modes.</p>
-
-          <div class="segmented measure-narrow mt-3" id="optThemeSeg">
+          <div class="segmented setting-seg" id="optThemeSeg">
             <button class="seg-btn" data-value="light" type="button">Light</button>
             <button class="seg-btn" data-value="dark" type="button">Dark</button>
-            <button class="seg-btn" data-value="system" type="button">System Auto</button>
+            <button class="seg-btn" data-value="system" type="button">System</button>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-name">Sync rules across your Chromes</span>
+            <span class="setting-desc">Uses Chrome sync, which holds about 8 KB — enough for rules, not for long histories.</span>
+            <div class="settings-note" id="optSyncNote" role="status" aria-live="polite" hidden></div>
+          </div>
+          <label class="switch" for="optSyncToggle">
+            <input type="checkbox" id="optSyncToggle" role="switch" aria-label="Sync rules across your Chromes" />
+            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+          </label>
+        </div>
+
+        <h2 class="settings-group">The daily standard</h2>
+        <div class="setting">
+          <div class="setting-info">
+            <label class="setting-name" for="optLeisureCeilingInput">Leisure ceiling</label>
+            <span class="setting-desc">A day is held only if leisure time stays at or under this. 15–240 minutes.</span>
+          </div>
+          <div class="setting-input">
+            <input class="field" type="number" id="optLeisureCeilingInput" min="15" max="240" step="1" />
+            <span class="unit">min</span>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="setting-info">
+            <label class="setting-name" for="optFocusTargetInput">Focus target</label>
+            <span class="setting-desc">A day is held only if the focus score reaches this. Waived on days under 30 minutes tracked.</span>
+          </div>
+          <div class="setting-input">
+            <input class="field" type="number" id="optFocusTargetInput" min="40" max="90" step="1" />
+            <span class="unit">score</span>
           </div>
         </div>
 
-        <div class="card settings-card">
-          <h3>When a daily limit runs out</h3>
-          <p class="card-desc">What happens by default on a site whose daily limit is spent.</p>
-
-          <div class="segmented measure-narrow mt-3" id="optDefaultActionSeg">
-            <button class="seg-btn active" data-value="page">Reality-Check Page</button>
-            <button class="seg-btn" data-value="redirect">Custom Redirect URL</button>
+        <h2 class="settings-group">Your data</h2>
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-name">Back up</span>
+            <span class="setting-desc">One JSON file with every rule, schedule, preference and your record.</span>
           </div>
-
-          <div id="optGlobalRedirectRow" class="measure mt-3" hidden>
-            <label for="optGlobalRedirectInput" class="field-label">Default Redirect URL</label>
-            <input class="field" id="optGlobalRedirectInput" placeholder="https://..." />
-          </div>
+          <button class="btn-ghost" id="optExportBtn" type="button">Export</button>
         </div>
-
-        <div class="card settings-card">
-          <h3>The Daily Standard</h3>
-          <p class="card-desc">Two thresholds that decide whether a day counts as held — the basis for streaks, XP and achievements.</p>
-
-          <div class="measure mt-4">
-            <div class="field-row">
-              <label for="optLeisureCeilingInput">Leisure ceiling</label>
-              <input class="field" type="number" id="optLeisureCeilingInput" min="15" max="240" step="1" />
-              <span class="unit">min/day</span>
-            </div>
-            <p class="card-desc field-hint-tight">A day is only held if leisure-category time stays at or under this many minutes.</p>
-          </div>
-
-          <div class="measure mt-5">
-            <div class="field-row">
-              <label for="optFocusTargetInput">Focus target</label>
-              <input class="field" type="number" id="optFocusTargetInput" min="40" max="90" step="1" />
-              <span class="unit">score</span>
-            </div>
-            <p class="card-desc field-hint-tight">A day is only held if the focus score reaches this value — waived on a day with under 30 minutes tracked.</p>
-          </div>
-        </div>
-
-        <h2 class="section-title mt-5">Backup & Restore</h2>
-
-        <div class="grid-2col">
-          <div class="card settings-card">
-            <h3>Export</h3>
-            <p class="card-desc">A JSON file with every rule, schedule and preference. Yours to keep.</p>
-            <button class="btn-primary btn-accent mt-4" id="optExportBtn" type="button">Export Backup JSON</button>
-          </div>
-
-          <div class="card settings-card">
-            <h3>Import</h3>
-            <p class="card-desc">Restore rules and preferences from a file you exported earlier.</p>
-            <button class="btn-ghost mt-4" id="optImportBtn" type="button">Import Backup File</button>
-            <input type="file" id="optImportFile" accept="application/json" hidden />
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-name">Restore</span>
+            <span class="setting-desc">Replace your rules and record with a file you exported earlier.</span>
             <div class="settings-note" id="optImportNote" role="status" aria-live="polite" hidden></div>
           </div>
+          <button class="btn-ghost" id="optImportBtn" type="button">Import</button>
+          <input type="file" id="optImportFile" accept="application/json" hidden />
         </div>
-
-        <div class="card danger-card">
-          <h3>Danger Zone</h3>
-          <p>Removes every rule and the whole time history. Your record — level, streaks and achievements — is kept. This cannot be undone.</p>
-          <button class="btn-danger" id="optResetAllBtn" type="button">Reset All Data & Clear History</button>
+        <div class="setting setting-danger">
+          <div class="setting-info">
+            <span class="setting-name">Delete every rule and the time history</span>
+            <span class="setting-desc">Your record — level, streaks and achievements — is kept. This can't be undone.</span>
+          </div>
+          <button class="btn-danger" id="optResetAllBtn" type="button">Delete</button>
         </div>
-      </div>
+      </section>
     </section>
 
   </main>
@@ -373,7 +296,7 @@
   <dialog class="modal-dialog" id="ytClassifyModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="ytClassifyTitle">Classify Channel</h3>
+        <h3 id="ytClassifyTitle">Classify a channel</h3>
         <button class="modal-close" id="ytClassifyCloseBtn" type="button">&times;</button>
       </div>
       <form id="ytClassifyForm" class="modal-body" novalidate>
@@ -388,7 +311,7 @@
         <label class="field-label mt-4">Category</label>
         <div class="segmented" id="ytClassifyMacroSeg">
           <button class="seg-btn" type="button" data-value="Productivity">Productive</button>
-          <button class="seg-btn active" type="button" data-value="General">General Browsing</button>
+          <button class="seg-btn active" type="button" data-value="General">General</button>
           <button class="seg-btn" type="button" data-value="Leisure">Leisure</button>
         </div>
 
@@ -399,7 +322,7 @@
 
         <div class="modal-footer">
           <button class="btn-ghost" type="button" id="ytClassifyCancelBtn">Cancel</button>
-          <button class="btn-primary btn-accent" type="submit">Save Classification</button>
+          <button class="btn-accent" type="submit">Save</button>
         </div>
       </form>
     </div>
@@ -409,24 +332,24 @@
   <dialog class="modal-dialog" id="customCategoryModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="customCategoryTitle">Custom Category</h3>
+        <h3 id="customCategoryTitle">New category</h3>
         <button class="modal-close" id="customCategoryCloseBtn" type="button">&times;</button>
       </div>
       <form id="customCategoryForm" class="modal-body" novalidate>
-        <label for="customCategoryName" class="field-label">Micro category name</label>
+        <label for="customCategoryName" class="field-label">Name</label>
         <input class="field" id="customCategoryName" placeholder="e.g. Study" />
         <div class="field-error" id="customCategoryError"></div>
 
-        <label class="field-label mt-4">Macro category</label>
+        <label class="field-label mt-4">Counts as</label>
         <div class="segmented" id="customCategoryMacroSeg">
           <button class="seg-btn" type="button" data-value="Productivity">Productive</button>
-          <button class="seg-btn active" type="button" data-value="General">General Browsing</button>
+          <button class="seg-btn active" type="button" data-value="General">General</button>
           <button class="seg-btn" type="button" data-value="Leisure">Leisure</button>
         </div>
 
         <div class="modal-footer">
           <button class="btn-ghost" type="button" id="customCategoryCancelBtn">Cancel</button>
-          <button class="btn-primary btn-accent" type="submit">Save Category</button>
+          <button class="btn-accent" type="submit">Save category</button>
         </div>
       </form>
     </div>
@@ -455,6 +378,16 @@
           <label for="optModalMinutes">Daily limit</label>
           <input class="field" type="number" id="optModalMinutes" value="30" min="1" />
           <span class="unit">min/day</span>
+        </div>
+
+        <div id="optModalActionRow" class="mt-4">
+          <label class="field-label">When it stops you</label>
+          <div class="segmented" id="optModalActionSeg">
+            <button class="seg-btn active" type="button" data-value="page">Show Stoic's page</button>
+            <button class="seg-btn" type="button" data-value="redirect">Send me somewhere</button>
+          </div>
+          <input class="field mt-3" id="optModalRedirect" placeholder="e.g. todoist.com" hidden />
+          <div class="field-error" id="optModalRedirectError"></div>
         </div>
 
         <div id="optModalRestraintRow" class="mt-3" hidden>
@@ -506,7 +439,7 @@
 
         <div class="modal-footer">
           <button class="btn-ghost" type="button" id="optModalCancelBtn">Cancel</button>
-          <button class="btn-primary btn-accent" type="submit" id="optModalSaveBtn">Save Rule</button>
+          <button class="btn-accent" type="submit" id="optModalSaveBtn">Save rule</button>
         </div>
       </form>
     </div>
@@ -519,14 +452,14 @@
   <dialog class="modal-dialog" id="frictionGateModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="fgTitle">Are you sure?</h3>
+        <h3 id="fgTitle">The pause</h3>
         <button class="modal-close" id="fgCloseBtn" type="button">&times;</button>
       </div>
       <div class="modal-body">
         <p class="fg-copy" id="fgCopy"></p>
 
         <div class="fg-step">
-          <div class="gate-step-label">1 · Wait it out — cannot be skipped</div>
+          <div class="gate-step-label">1 · Wait sixty seconds</div>
           <div class="fg-wait-row">
             <div class="fg-wait-bar-bg"><div class="fg-wait-bar-fill" id="fgWaitBar"></div></div>
             <span class="fg-wait-val" id="fgWaitVal">60s</span>
@@ -545,7 +478,7 @@
         </div>
 
         <div class="fg-step">
-          <div class="gate-step-label">3 · Explain, honestly, why you're doing this</div>
+          <div class="gate-step-label">3 · Say why, in your own words</div>
           <textarea class="field" id="fgReasonInput" rows="3" placeholder="Write a real, specific reason…"></textarea>
           <div class="field-error" id="fgReasonErr"></div>
         </div>
@@ -557,7 +490,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn-ghost" type="button" id="fgCancelBtn">Cancel</button>
-        <button class="btn-primary fg-danger-btn" type="button" id="fgConfirmBtn" disabled>Proceed</button>
+        <button class="btn-accent fg-danger-btn" type="button" id="fgConfirmBtn" disabled>Proceed</button>
       </div>
     </div>
   </dialog>

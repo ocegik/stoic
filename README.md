@@ -41,8 +41,9 @@ actually make you close the tab.
     (e.g. a reading app, a to-do list, anything you'd rather be doing).
   - The action picker also lives under **More options**; the default is
     the reality-check page.
-- **Pause/resume** a discipline without deleting it, for when you
-  genuinely need temporary access.
+- **Suspend** a rule for 15 minutes, an hour, or the rest of today. It
+  comes back on its own; there is no open-ended "off" switch. Suspending
+  costs the same pause as loosening; resuming is free.
 - **Edit in place** — click any discipline row (or a quick-add chip for a
   site you already added) to load its settings back into the form.
 - Press **Enter** in any field of the discipline form to save it —
@@ -107,8 +108,12 @@ watch next.
 
 ## Notes / limitations
 
-- Time is tracked only while a matching tab is the active tab in a
-  focused window and the discipline is currently inside its schedule.
+- Time is tracked only while a site is the active tab in a focused
+  window. It stops when the screen is locked, and after 60 seconds without
+  keyboard or mouse input unless the tab is playing audio (watching a video
+  counts; walking away doesn't). The tracking session survives the MV3
+  service worker being suspended (`chrome.storage.session`), so time isn't
+  lost every time Chrome idles the worker.
   Usage is measured from real elapsed time between checks (not a flat
   per-check credit), so it stays accurate whether Chrome fires the
   tracking alarm every 5 seconds (unpacked/dev mode) or every ~30

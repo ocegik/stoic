@@ -512,11 +512,111 @@ function isLooseningRule(oldEntry, newEntry) {
   return false;
 }
 
+// ---------- suspending a rule ----------
+// A rule can be suspended for a fixed stretch (never open-ended — an
+// indefinite suspension is just a deletion that hides itself). Stored as
+// `paused: true` + `pausedUntil` (epoch ms). A legacy `paused: true` with no
+// `pausedUntil` predates timed suspension and stays suspended until resumed.
+// `suspendedOn` keeps the day keys a suspension touched, so settlement can
+// exempt exactly those days instead of reading whatever state the rule is
+// in when settlement happens to run.
+const SUSPEND_OPTIONS = [
+  { id: "15m", label: "15 minutes", minutes: 15 },
+  { id: "1h", label: "1 hour", minutes: 60 },
+  { id: "day", label: "Rest of today", minutes: null },
+];
+const MAX_SUSPENDED_DAYS = 14;
+
+function isRuleSuspended(entry, now = Date.now()) {
+  if (!entry || !entry.paused) return false;
+  return !entry.pausedUntil || entry.pausedUntil > now;
+}
+
+function wasSuspendedOn(entry, dayKey) {
+  if (!entry) return false;
+  if (entry.paused && !entry.pausedUntil) return true; // legacy open-ended
+  return Array.isArray(entry.suspendedOn) && entry.suspendedOn.includes(dayKey);
+}
+
+function suspendUntil(optionId, now = new Date()) {
+  const option = SUSPEND_OPTIONS.find((o) => o.id === optionId) || SUSPEND_OPTIONS[0];
+  if (option.minutes) return now.getTime() + option.minutes * 60000;
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  return midnight.getTime();
+}
+
+// Mutates entry in place.
+function suspendRule(entry, optionId, now = new Date()) {
+  entry.paused = true;
+  entry.pausedUntil = suspendUntil(optionId, now);
+  const today = dateKey(now);
+  const days = (entry.suspendedOn || []).filter((d) => d !== today);
+  days.push(today);
+  entry.suspendedOn = days.slice(-MAX_SUSPENDED_DAYS);
+  return entry;
+}
+
+// Mutates entry in place. `suspendedOn` stays: today was still suspended.
+function resumeRule(entry) {
+  delete entry.paused;
+  delete entry.pausedUntil;
+  return entry;
+}
+
+// "Suspended · back at 3:40 PM" style copy. Null when not suspended.
+function suspensionLabel(entry, now = Date.now()) {
+  if (!isRuleSuspended(entry, now)) return null;
+  if (!entry.pausedUntil) return "Suspended until you resume it";
+  const until = new Date(entry.pausedUntil);
+  if (dateKey(until) !== dateKey(new Date(now)) || (until.getHours() === 0 && until.getMinutes() === 0)) {
+    return "Suspended for the rest of today";
+  }
+  const mins = Math.ceil((entry.pausedUntil - now) / 60000);
+  const time = until.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `Suspended · back at ${time} (${fmtMinutes(mins)})`;
+}
+
+// "Every day", "Mon–Fri · 09:00–17:00", "Sat, Sun". Plain language for a card.
+function scheduleSummary(entry) {
+  const schedule = normalizeSchedule(entry?.schedule);
+  const days = ALL_DAYS.filter((d) => schedule.days.includes(d));
+  let dayText;
+  if (days.length === 7) dayText = "Every day";
+  else if (days.length === 0) dayText = "No days";
+  else if (days.join() === "1,2,3,4,5") dayText = "Weekdays";
+  else if (days.join() === "0,6") dayText = "Weekends";
+  else dayText = [1, 2, 3, 4, 5, 6, 0].filter((d) => days.includes(d)).map((d) => DAY_LABELS[d]).join(", ");
+  const hours = schedule.startTime || schedule.endTime
+    ? ` · ${schedule.startTime || "00:00"}–${schedule.endTime || "24:00"}`
+    : "";
+  return dayText + hours;
+}
+
+// Why a rule is or isn't in force right now, in one short phrase.
+function ruleStatus(entry, date = new Date()) {
+  const suspended = suspensionLabel(entry, date.getTime());
+  if (suspended) return { state: "suspended", text: suspended };
+  if (!isScheduleDay(entry, date)) return { state: "off", text: "Not scheduled today" };
+  if (!isWithinTimeWindow(entry, date)) return { state: "off", text: "Outside its hours right now" };
+  return { state: "active", text: "In force now" };
+}
+
+// Times this rule stopped the user today. `trippedToday` is reset at the
+// day rollover, but rollover is lazy (next visit), so a stale counter is
+// only trusted when lastReset says it belongs to `today`.
+function tripsForDate(entry, key, today = todayStr()) {
+  if (!entry) return 0;
+  if (entry.lastReset === key) return entry.trippedToday || 0;
+  const found = (entry.history || []).find((h) => h.date === key);
+  return (found && found.trips) || 0;
+}
+
 function getActiveRule(entry, date = new Date()) {
   const scheduledToday = isScheduleDay(entry, date);
   const withinHours = isWithinTimeWindow(entry, date);
   return {
-    active: scheduledToday && withinHours && !entry?.paused,
+    active: scheduledToday && withinHours && !isRuleSuspended(entry, date.getTime()),
     scheduledToday,
     withinHours,
     limitMinutes: limitMinutesForDate(entry, date),
@@ -590,7 +690,7 @@ function getTopSitesToday(sites, today = todayStr()) {
         seconds: sec,
         minutes: Math.round(sec / 60),
         mode: entry.mode || "unconstrained",
-        paused: !!entry.paused,
+        paused: isRuleSuspended(entry),
       });
     }
   });
@@ -1488,11 +1588,11 @@ function generateQuickInsight(sites, today = todayStr()) {
 
   // 3. Behavioral moderation insight if limits triggered
   if (moderation.limitsTriggeredToday > 0) {
-    return `Stoic enforced moderation on ${moderation.limitsTriggeredToday} occasion${moderation.limitsTriggeredToday > 1 ? 's' : ''} today, saving an estimated ${fmtMinutes(moderation.estimatedTimeSavedMinutes)}.`;
+    return `Your rules stopped you ${moderation.limitsTriggeredToday} time${moderation.limitsTriggeredToday > 1 ? "s" : ""} today.`;
   }
 
   if (moderation.limitedSitesCount > 0 && moderation.limitsTriggeredToday === 0) {
-    return `Great restraint today — you have not hit any moderation limits so far.`;
+    return `No rule has had to stop you yet today.`;
   }
 
   const totalMinStr = fmtDuration(totalSeconds);
@@ -1588,7 +1688,7 @@ function getBrowsingStats(sites, today = todayStr()) {
         seconds: sec,
         minutes: Math.round(sec / 60),
         mode: entry.mode || "unconstrained",
-        paused: !!entry.paused,
+        paused: isRuleSuspended(entry),
         taxonomy: effective,
         domainTaxonomy: taxonomy,
         segments,
@@ -1723,44 +1823,37 @@ function getModerationStats(sites, today = todayStr()) {
   let limitedSitesCount = 0;
   let limitsTriggeredToday = 0;
   let totalTimesTripped = 0;
-  let estimatedTimeSavedMinutes = 0;
+  let suspendedCount = 0;
   const activeRulesList = [];
 
   Object.keys(sites || {}).forEach((domain) => {
     const entry = sites[domain];
-    if (entry.mode === "limit" || entry.mode === "block") {
-      limitedSitesCount++;
-      const tripped = entry.timesTripped || 0;
-      totalTimesTripped += tripped;
-      if (entry.lastReset === today && tripped > 0) {
-        limitsTriggeredToday += tripped;
-      }
-      
-      const usedSec = usageSecondsForDate(entry, today, today);
-      const limitSec = (entry.limitMinutes || 30) * 60;
-      if (entry.mode === "block") {
-        estimatedTimeSavedMinutes += Math.round(usedSec / 60) + 30;
-      } else if (usedSec >= limitSec) {
-        estimatedTimeSavedMinutes += Math.round((usedSec - limitSec) / 60) + 15;
-      }
+    if (!entryHasRule(entry)) return;
+    limitedSitesCount++;
+    const tripped = entry.timesTripped || 0;
+    const trippedToday = tripsForDate(entry, today, today);
+    const paused = isRuleSuspended(entry);
+    totalTimesTripped += tripped;
+    limitsTriggeredToday += trippedToday;
+    if (paused) suspendedCount++;
 
-      activeRulesList.push({
-        domain,
-        entry,
-        mode: entry.mode,
-        limitMinutes: entry.limitMinutes || 0,
-        usedSeconds: usedSec,
-        timesTripped: tripped,
-        paused: !!entry.paused,
-      });
-    }
+    activeRulesList.push({
+      domain,
+      entry,
+      mode: entry.mode,
+      limitMinutes: entry.limitMinutes || 0,
+      usedSeconds: usageSecondsForDate(entry, today, today),
+      timesTripped: tripped,
+      trippedToday,
+      paused,
+    });
   });
 
   return {
     limitedSitesCount,
     limitsTriggeredToday,
     totalTimesTripped,
-    estimatedTimeSavedMinutes,
+    suspendedCount,
     activeRulesList,
   };
 }
@@ -1833,6 +1926,9 @@ function getDomainDisplayName(domain) {
     { key: "leetcode", name: "LeetCode" },
     { key: "hackerrank", name: "HackerRank" },
     { key: "codeforces", name: "Codeforces" },
+    { key: "discord", name: "Discord" },
+    { key: "whatsapp", name: "WhatsApp" },
+    { key: "telegram", name: "Telegram" },
   ];
 
   for (const b of brandKeywords) {
@@ -1841,9 +1937,13 @@ function getDomainDisplayName(domain) {
     }
   }
 
-  const parts = d.split(".");
-  const leftmost = parts[0] || d;
-  return leftmost;
+  // Leftmost label (a project on a hosting domain is named there), unless
+  // it's a generic prefix: "app.example.com" is example, not "app".
+  const GENERIC = /^(app|apps|web|m|mobile|mail|my|account|accounts|portal|dashboard|console|login|auth|api|en|home)$/;
+  const parts = d.split(".").filter(Boolean);
+  let i = 0;
+  while (i < parts.length - 2 && GENERIC.test(parts[i])) i++;
+  return parts[i] || d;
 }
 
 const api = {
@@ -1935,6 +2035,16 @@ const api = {
   applyTheme,
   effectiveModeForDate,
   dateForDay,
+  SUSPEND_OPTIONS,
+  isRuleSuspended,
+  wasSuspendedOn,
+  suspendUntil,
+  suspendRule,
+  resumeRule,
+  suspensionLabel,
+  scheduleSummary,
+  ruleStatus,
+  tripsForDate,
 };
 
 if (typeof module !== "undefined" && module.exports) {

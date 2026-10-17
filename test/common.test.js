@@ -22,6 +22,7 @@ const {
 test("getDomainDisplayName: prefers recognized brands, otherwise uses leftmost label", () => {
   assert.equal(getDomainDisplayName("ocegikodyssey.vercel.com"), "ocegikodyssey");
   assert.equal(getDomainDisplayName("student.mycollege.edu"), "student");
+  assert.equal(getDomainDisplayName("app.sacnilk.com"), "sacnilk", "generic prefixes are skipped");
   assert.equal(getDomainDisplayName("notes.physicswallah.com"), "PhysicsWallah");
   assert.equal(getDomainDisplayName("youtube.com"), "YouTube");
   assert.equal(getDomainDisplayName("github.com"), "GitHub");
@@ -287,7 +288,7 @@ test("separation of tracking vs moderation stats: getBrowsingStats & getModerati
   const sites = {
     "youtube.com": { mode: "unconstrained", usedSeconds: 1800, lastReset: "2026-07-26" },
     "github.com": { mode: "unconstrained", usedSeconds: 2400, lastReset: "2026-07-26" },
-    "reddit.com": { mode: "limit", limitMinutes: 30, usedSeconds: 2100, lastReset: "2026-07-26", timesTripped: 2 },
+    "reddit.com": { mode: "limit", limitMinutes: 30, usedSeconds: 2100, lastReset: "2026-07-26", timesTripped: 40, trippedToday: 2 },
   };
 
   const browsing = getBrowsingStats(sites, "2026-07-26");
@@ -298,7 +299,37 @@ test("separation of tracking vs moderation stats: getBrowsingStats & getModerati
 
   const moderation = getModerationStats(sites, "2026-07-26");
   assert.equal(moderation.limitedSitesCount, 1, "Limited sites count must only count reddit.com");
-  assert.equal(moderation.limitsTriggeredToday, 2, "Limits triggered count must reflect timesTripped");
+  assert.equal(moderation.limitsTriggeredToday, 2, "Today's count is trippedToday, never the all-time timesTripped");
+});
+
+test("trips: a stale trippedToday from an un-rolled day is not today's", () => {
+  const { tripsForDate, getModerationStats } = require("../common.js");
+  const entry = { mode: "block", lastReset: "2026-07-25", trippedToday: 9, timesTripped: 300, history: [{ date: "2026-07-24", seconds: 0, trips: 4 }] };
+  assert.equal(tripsForDate(entry, "2026-07-26", "2026-07-26"), 0);
+  assert.equal(tripsForDate(entry, "2026-07-25", "2026-07-26"), 9);
+  assert.equal(tripsForDate(entry, "2026-07-24", "2026-07-26"), 4);
+  const stats = getModerationStats({ "x.com": entry, "reddit.com": { mode: "restraint", lastReset: "2026-07-26", trippedToday: 1 } }, "2026-07-26");
+  assert.equal(stats.limitedSitesCount, 2, "pause-first rules count as rules");
+  assert.equal(stats.limitsTriggeredToday, 1);
+});
+
+test("suspend: timed suspension ends on its own and marks the day", () => {
+  const { suspendRule, resumeRule, isRuleSuspended, wasSuspendedOn, getActiveRule, suspendUntil } = require("../common.js");
+  const now = new Date(2026, 6, 26, 10, 0, 0);
+  const entry = { mode: "block" };
+  suspendRule(entry, "1h", now);
+  assert.equal(entry.pausedUntil, now.getTime() + 3600000);
+  assert.ok(isRuleSuspended(entry, now.getTime() + 1000));
+  assert.ok(!isRuleSuspended(entry, now.getTime() + 3600001));
+  assert.ok(!getActiveRule(entry, new Date(now.getTime() + 60000)).active);
+  assert.ok(getActiveRule(entry, new Date(now.getTime() + 3600001)).active);
+  assert.ok(wasSuspendedOn(entry, "2026-07-26"));
+  assert.ok(!wasSuspendedOn(entry, "2026-07-27"));
+  assert.equal(new Date(suspendUntil("day", now)).getHours(), 0, "rest of today ends at midnight");
+  resumeRule(entry);
+  assert.ok(!isRuleSuspended(entry));
+  assert.ok(wasSuspendedOn(entry, "2026-07-26"), "resuming keeps today exempt");
+  assert.ok(isRuleSuspended({ paused: true }), "legacy open-ended pause still honoured");
 });
 
 test("hierarchical taxonomy: micro to macro mappings & classification rules", () => {

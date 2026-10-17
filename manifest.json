@@ -3,7 +3,7 @@
   "name": "Stoic",
   "version": "2.3.0",
   "description": "Sixty seconds before a site opens, and an honest record of where your attention actually went. Everything stays on your machine.",
-  "permissions": ["storage", "tabs", "alarms", "notifications"],
+  "permissions": ["storage", "tabs", "alarms", "notifications", "idle"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

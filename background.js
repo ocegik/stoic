@@ -15,6 +15,9 @@
 //     dayLimits: { [day]: number } // optional per-day moderation limits
 //   },
 //   timesTripped: number,       // all-time count of times the breaker tripped
+//   trippedToday: number,       // same, today only (archived as history[].trips)
+//   pausedUntil: number,        // epoch ms a suspension ends (see suspendRule)
+//   suspendedOn: string[],      // day keys a suspension touched
 //   notified80: boolean,        // pre-limit warnings sent today
 //   notified90: boolean,
 //   createdAt: "YYYY-MM-DD"
@@ -57,6 +60,33 @@ const WARNING_COPY = {
 
 let activeState = { tabId: null, domain: null, windowFocused: true, lastAccountedAt: Date.now() };
 
+// MV3 evicts the worker after ~30s idle, which is about the packed alarm
+// period — so without this, nearly every tick woke to a fresh activeState,
+// saw "new session" and credited nothing. chrome.storage.session survives
+// eviction (not a browser restart, which is exactly the right lifetime).
+const ACTIVE_STATE_KEY = "stoic_active_state";
+let activeStateLoaded = false;
+
+async function loadActiveState() {
+  if (activeStateLoaded) return;
+  activeStateLoaded = true;
+  try {
+    const { [ACTIVE_STATE_KEY]: saved } = await chrome.storage.session.get(ACTIVE_STATE_KEY);
+    if (saved && typeof saved.lastAccountedAt === "number") activeState = saved;
+  } catch {
+    /* session storage unavailable — fall back to in-memory only */
+  }
+}
+
+function persistActiveState() {
+  chrome.storage.session.set({ [ACTIVE_STATE_KEY]: activeState }).catch(() => {});
+}
+
+// Seconds of no keyboard/mouse input before the user counts as away. A tab
+// playing audio (a video, a lecture) still counts — watching isn't input.
+const IDLE_DETECTION_SECONDS = 60;
+chrome.idle.setDetectionInterval(IDLE_DETECTION_SECONDS);
+
 // Reads the currently focused window's active tab. Chrome-API calls only —
 // no storage IO — so it's safe to run before we've decided whether this
 // tick needs to touch storage at all.
@@ -67,6 +97,12 @@ async function resolveActiveTab() {
 
   const [tab] = await chrome.tabs.query({ active: true, windowId: focusedWin.id });
   if (!tab || !tab.url) return { tabId: null, domain: null, windowFocused: true };
+
+  // Locked screen never counts; idle counts only while the tab is audible.
+  const idle = await chrome.idle.queryState(IDLE_DETECTION_SECONDS);
+  if (idle === "locked" || (idle === "idle" && !tab.audible)) {
+    return { tabId: null, domain: null, windowFocused: false };
+  }
 
   return { tabId: tab.id, domain: getDomain(tab.url), windowFocused: true };
 }
@@ -151,6 +187,7 @@ function isTrackableDomain(domain) {
 // once at the top and saved once at the end — never more than one
 // read-modify-write round trip to storage per call.
 async function tick() {
+  await loadActiveState();
   const current = await resolveActiveTab();
   const previous = activeState;
   const now = Date.now();
@@ -165,6 +202,7 @@ async function tick() {
   const elapsedSeconds = clampElapsed((now - lastAccountedAt) / 1000);
 
   activeState = { ...current, lastAccountedAt: now };
+  persistActiveState();
 
   if (!current.domain || !current.windowFocused || !isTrackableDomain(current.domain)) return;
 
@@ -185,6 +223,14 @@ async function tick() {
 
   const entry = sites[key];
   const rolledOver = ensureReset(entry);
+
+  // Tidy an expired suspension so the stored rule reads as in force again.
+  // getActiveRule already ignores it; this only keeps storage honest.
+  let suspensionEnded = false;
+  if (entry.paused && entry.pausedUntil && entry.pausedUntil <= now) {
+    resumeRule(entry);
+    suspensionEnded = true;
+  }
 
   // Single place that credits elapsed time, so the plain counter and the
   // per-content attribution can never diverge. For YouTube the seconds are
@@ -210,9 +256,9 @@ async function tick() {
   const activeRule = getActiveRule(entry, new Date(now));
 
   if (!activeRule.active) {
-    if (rolledOver) {
+    if (rolledOver || suspensionEnded) {
       await saveSites(sites); // persist a possible day-rollover
-      runSettlement(); // fire-and-forget
+      if (rolledOver) runSettlement(); // fire-and-forget
     }
     return;
   }
@@ -245,6 +291,7 @@ async function tick() {
 
   if (tripReason) {
     entry.timesTripped = (entry.timesTripped || 0) + 1;
+    entry.trippedToday = (entry.trippedToday || 0) + 1;
     entry.lastTrippedAt = Date.now();
   }
 
@@ -253,6 +300,7 @@ async function tick() {
 
   if (tripReason) {
     activeState.domain = null; // stop crediting a tab we just blocked/redirected away from
+    persistActiveState();
     await navigateAfterTrip(current.tabId, key, entry, tripReason);
   }
 }
@@ -356,6 +404,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   delete latestYouTubeMetadataByTab[tabId];
 });
 chrome.windows.onFocusChanged.addListener(() => runTick());
+chrome.idle.onStateChanged.addListener(() => runTick());
 
 // Prime the YouTube stores so the very first tick after the worker wakes
 // classifies against real data instead of an empty snapshot, then run tick

@@ -72,9 +72,13 @@ function matchSite(domain, sites) {
 function ensureReset(entry, today = getTodayKey()) {
   if (entry.lastReset === today) return false;
 
-  if (entry.usedSeconds > 0) {
+  // A day with zero seconds but trips still belongs in history — an
+  // always-closed site is never open long enough to accrue time, and the
+  // trips are the whole story of that day.
+  if (entry.usedSeconds > 0 || entry.trippedToday > 0) {
     entry.history = entry.history || [];
-    const record = { date: entry.lastReset, seconds: entry.usedSeconds };
+    const record = { date: entry.lastReset, seconds: entry.usedSeconds || 0 };
+    if (entry.trippedToday > 0) record.trips = entry.trippedToday;
     // Carry the day's per-content watch-time attribution into the archive
     // alongside its total, so a past day can still be broken down by
     // category rather than collapsing to the generic domain rule.
@@ -87,6 +91,7 @@ function ensureReset(entry, today = getTodayKey()) {
     }
   }
   entry.usedSeconds = 0;
+  entry.trippedToday = 0;
   entry.youtube = null;
   entry.lastReset = today;
   entry.notified80 = false;

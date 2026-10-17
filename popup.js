@@ -95,7 +95,7 @@ async function resolveActiveDomain() {
 
 function describeRule(entry) {
   if (!entryHasRule(entry)) return null;
-  if (entry.paused) return { text: "Rule paused", cls: "cs-rule" };
+  if (isRuleSuspended(entry)) return { text: suspensionLabel(entry), cls: "cs-rule" };
   if (entry.mode === "limit") {
     return { text: `${MODE_LABELS.limit} · ${entry.limitMinutes || 30}m`, cls: "cs-rule-limit" };
   }
@@ -126,7 +126,7 @@ function renderCurrentSite() {
 
   // Kept short enough to survive a long domain name without truncating.
   const meta = hasRule
-    ? (entry.mode === "limit" && !entry.paused
+    ? (entry.mode === "limit" && !isRuleSuspended(entry)
         ? `<span class="${rule.cls}">${fmtDuration(usedSeconds)} of ${entry.limitMinutes || 30}m</span>`
         : `<span class="${rule.cls}">${escapeHtml(rule.text)}</span> · ${fmtDuration(usedSeconds)}`)
     : `${fmtDuration(usedSeconds)} today · no rule`;

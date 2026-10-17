@@ -349,3 +349,11 @@ test("createCoalescingRunner: a failed run still lets a queued call run afterwar
 
   assert.equal(callCount, 2, "the queued run should still execute even though the first one threw");
 });
+
+test("ensureReset archives a zero-second day that had trips, and resets trippedToday", () => {
+  const { ensureReset } = require("../background-logic.js");
+  const entry = { usedSeconds: 0, trippedToday: 5, lastReset: "2026-07-25", history: [] };
+  ensureReset(entry, "2026-07-26");
+  assert.deepEqual(entry.history, [{ date: "2026-07-25", seconds: 0, trips: 5 }]);
+  assert.equal(entry.trippedToday, 0);
+});

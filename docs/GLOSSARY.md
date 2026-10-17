@@ -35,6 +35,7 @@ retention depends on it. Stoic's thesis forbids it.
 | A constraint the user created | **rule** | discipline, moderation rule, site limiter, restriction |
 | A daily time cap on a site | **daily limit** | moderation, allowance, cap, quota |
 | Friction shown before a site opens | **the pause** | restraint mode, mindful restraint, interstitial, cooling-off |
+| Turning a rule off for a fixed stretch (15 min, 1 hour, rest of today) | **suspend** / **resume** | pause (reserved for the gate), disable, snooze |
 | A site set never to open | **always closed** | full block, block mode, restraint |
 | The 60s + two problems + one sentence challenge | **the pause** (user-facing) / *friction gate* (code only) | challenge, puzzle gate, hurdle |
 | Turning away instead of pushing through | **turned back**, a **refusal** | resisted, willpower, self-control |

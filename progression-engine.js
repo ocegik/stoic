@@ -52,6 +52,7 @@ const {
   isScheduleDay,
   limitMinutesForDate,
   getSites,
+  wasSuspendedOn,
 } = commonApi;
 
 const {
@@ -134,7 +135,7 @@ function buildDaySnapshot(sites, dayKey, gateCounters) {
     // (audit §6.4: it's an all-time counter, not day-scoped) and never to
     // a paused rule (a paused rule wasn't in force, so it can neither be
     // violated nor extend its streak).
-    if (entry.paused) continue;
+    if (wasSuspendedOn(entry, dayKey)) continue;
 
     if (entry.mode === "limit") {
       const scheduled = isScheduleDay(entry, date);
