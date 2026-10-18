@@ -160,12 +160,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-4);
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-soft);
 }
 .bp-pass-label { font-size: var(--text-md); color: var(--text-muted); }
-.bp-pass-seg { width: 240px; margin: 0; }
+.bp-pass-seg { margin: 0; }
+.bp-pass-seg .seg-btn { white-space: nowrap; }
 
 /* ---- actions ---- */
 .bp-actions {

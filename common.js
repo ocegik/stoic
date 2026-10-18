@@ -156,6 +156,12 @@ function fmtDuration(seconds) {
   return fmtMinutes(sec / 60);
 }
 
+// Ticking countdown: "45s", "4:05".
+function fmtCountdown(seconds) {
+  const sec = Math.max(0, Math.round(seconds));
+  return sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+
 function cleanPositiveMinutes(value) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
@@ -247,6 +253,24 @@ const RESTRAINT_WAIT_SECONDS = 60;
 const RESTRAINT_PUZZLE_STREAK_REQUIRED = 2;
 const RESTRAINT_MIN_REASON_WORDS = 12;
 
+// The bigger the escape, the bigger the cost. A one-minute peek is a short
+// wait and one problem; the rest of the day, or loosening a rule for good,
+// is a long wait, a long streak and a real paragraph. The 15-minute tier is
+// the RESTRAINT_* baseline above.
+const RESTRAINT_TIERS = [
+  { upTo: 1, wait: 15, puzzles: 1, words: 0 },
+  { upTo: 5, wait: 30, puzzles: 1, words: 6 },
+  { upTo: 15, wait: RESTRAINT_WAIT_SECONDS, puzzles: RESTRAINT_PUZZLE_STREAK_REQUIRED, words: RESTRAINT_MIN_REASON_WORDS },
+  { upTo: 60, wait: 120, puzzles: 3, words: 20 },
+  { upTo: 24 * 60, wait: 300, puzzles: 4, words: 30 },
+  { upTo: Infinity, wait: 600, puzzles: 5, words: 40 },
+];
+
+// minutes: how long the escape lasts; Infinity for loosening/deleting a rule.
+function restraintTier(minutes) {
+  return RESTRAINT_TIERS.find((t) => minutes <= t.upTo);
+}
+
 const REFLECTION_QUESTIONS = [
   "Is opening this site helping your primary goal today?",
   "What specific task or feeling are you seeking a break from right now?",
@@ -296,17 +320,18 @@ function generateHardPuzzle() {
 // Heuristic guard against low-effort "reasons" ("ok", "yes", ".", keyboard
 // mashing). It can't verify truthfulness, but it can force enough real
 // typed effort that reflexively clicking through stops being an option.
-function validateOpenReason(text) {
+function validateOpenReason(text, minWords = RESTRAINT_MIN_REASON_WORDS) {
   const raw = (text || "").trim();
+  if (minWords <= 0) return { valid: true, message: "" };
   if (!raw) {
     return { valid: false, message: "Explain, in your own words, why you need this right now." };
   }
 
   const words = raw.split(/\s+/).filter(Boolean);
-  if (words.length < RESTRAINT_MIN_REASON_WORDS) {
+  if (words.length < minWords) {
     return {
       valid: false,
-      message: `Write at least ${RESTRAINT_MIN_REASON_WORDS} words (${words.length}/${RESTRAINT_MIN_REASON_WORDS} so far).`,
+      message: `Write at least ${minWords} words (${words.length}/${minWords} so far).`,
     };
   }
 
@@ -2016,6 +2041,9 @@ const api = {
   RESTRAINT_WAIT_SECONDS,
   RESTRAINT_PUZZLE_STREAK_REQUIRED,
   RESTRAINT_MIN_REASON_WORDS,
+  RESTRAINT_TIERS,
+  restraintTier,
+  fmtCountdown,
   REFLECTION_QUESTIONS,
   generateHardPuzzle,
   validateOpenReason,

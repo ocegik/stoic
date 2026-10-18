@@ -192,11 +192,24 @@ async function main() {
   setInterval(renderReopen, 30000);
 }
 
-// The pause: a mandatory 60s wait, two hard problems back to back, and a
-// genuinely written reason — all running concurrently, all required before
-// Continue unlocks. The only choice offered is how long the site stays open
-// afterwards, and the shortest is the default.
-const PASS_OPTIONS = [5, 15, 30];
+// The pause: a wait, a streak of hard problems, and (past a one-minute peek)
+// a written reason — all running concurrently, all required before Continue
+// unlocks. How hard each one is scales with how long the site stays open
+// (restraintTier in common.js); the shortest, cheapest pass is the default.
+const PASS_OPTIONS = [
+  { label: "1 min", minutes: 1 },
+  { label: "5 min", minutes: 5 },
+  { label: "15 min", minutes: 15 },
+  { label: "30 min", minutes: 30 },
+  { label: "Rest of today", minutes: 24 * 60, restOfDay: true },
+];
+
+function passDurationMinutes(option) {
+  if (!option.restOfDay) return option.minutes;
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+  return Math.max(1, Math.ceil((midnight - Date.now()) / 60000));
+}
 
 function setupRestraintChallenge(site, destUrl) {
   const box = document.getElementById("restraintBox");
@@ -206,7 +219,8 @@ function setupRestraintChallenge(site, destUrl) {
   const passSeg = document.getElementById("passSeg");
   const displayName = getDomainDisplayName(site);
   const question = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
-  let passMinutes = PASS_OPTIONS[0];
+  let pass = PASS_OPTIONS[0];
+  let tier = restraintTier(pass.minutes);
 
   box.hidden = false;
   continueBtn.hidden = false;
@@ -215,17 +229,17 @@ function setupRestraintChallenge(site, destUrl) {
     <li class="bp-step" id="stepWait">
       <span class="bp-step-mark">1</span>
       <div>
-        <p class="bp-step-title">Wait sixty seconds</p>
+        <p class="bp-step-title" id="waitTitle"></p>
         <div class="bp-wait">
           <div class="bp-wait-track"><div class="bp-wait-fill" id="waitFill"></div></div>
-          <span class="bp-wait-val" id="waitVal">${RESTRAINT_WAIT_SECONDS}s</span>
+          <span class="bp-wait-val" id="waitVal"></span>
         </div>
       </div>
     </li>
     <li class="bp-step" id="stepPuzzle">
       <span class="bp-step-mark">2</span>
       <div>
-        <p class="bp-step-title">Solve ${RESTRAINT_PUZZLE_STREAK_REQUIRED} in a row</p>
+        <p class="bp-step-title" id="puzzleTitle"></p>
         <div class="bp-puzzle">
           <span class="bp-puzzle-q" id="puzzleQuestion"></span>
           <input type="number" class="field" id="puzzleInput" placeholder="Answer" aria-label="Answer" />
@@ -240,17 +254,18 @@ function setupRestraintChallenge(site, destUrl) {
       <div class="bp-reason">
         <p class="bp-step-title">Say why, in your own words</p>
         <p class="bp-reason-q">${question}</p>
-        <textarea class="field" id="reasonInput" rows="3" placeholder="At least ${RESTRAINT_MIN_REASON_WORDS} words"></textarea>
+        <textarea class="field" id="reasonInput" rows="3"></textarea>
         <div class="field-error" id="reasonErr" hidden></div>
       </div>
     </li>`;
 
-  passSeg.innerHTML = PASS_OPTIONS.map((m, i) => (
-    `<button type="button" class="seg-btn${i === 0 ? " active" : ""}" role="radio" aria-checked="${i === 0}" data-value="${m}">${m} min</button>`
+  passSeg.innerHTML = PASS_OPTIONS.map((o, i) => (
+    `<button type="button" class="seg-btn${i === 0 ? " active" : ""}" role="radio" aria-checked="${i === 0}" data-index="${i}">${o.label}</button>`
   )).join("");
   passSeg.querySelectorAll(".seg-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      passMinutes = Number(btn.dataset.value);
+      pass = PASS_OPTIONS[Number(btn.dataset.index)];
+      tier = restraintTier(pass.minutes);
       passSeg.querySelectorAll(".seg-btn").forEach((b) => {
         b.classList.toggle("active", b === btn);
         b.setAttribute("aria-checked", b === btn ? "true" : "false");
@@ -259,71 +274,72 @@ function setupRestraintChallenge(site, destUrl) {
     });
   });
 
-  const state = { wait: false, puzzle: false, reason: false };
-  const stepEls = { wait: "stepWait", puzzle: "stepPuzzle", reason: "stepReason" };
-
-  function refresh() {
-    let left = 0;
-    for (const key of Object.keys(state)) {
-      document.getElementById(stepEls[key]).classList.toggle("is-done", state[key]);
-      const mark = document.querySelector(`#${stepEls[key]} .bp-step-mark`);
-      mark.textContent = state[key] ? "✓" : String(Object.keys(state).indexOf(key) + 1);
-      if (!state[key]) left++;
-    }
-    gateCount.textContent = left ? `${left} step${left === 1 ? "" : "s"} left` : "Done";
-    gateCount.classList.toggle("is-done", !left);
-    continueBtn.disabled = left > 0;
-    continueBtn.textContent = left ? "Complete the steps above" : `Open ${displayName} for ${passMinutes} min`;
-  }
-  refresh();
-
-  // --- 1: wait ---
-  let rem = RESTRAINT_WAIT_SECONDS;
-  const waitFill = document.getElementById("waitFill");
-  const waitVal = document.getElementById("waitVal");
-  const timer = setInterval(() => {
-    rem--;
-    waitVal.textContent = `${Math.max(rem, 0)}s`;
-    waitFill.style.width = `${((RESTRAINT_WAIT_SECONDS - rem) / RESTRAINT_WAIT_SECONDS) * 100}%`;
-    if (rem <= 0) {
-      clearInterval(timer);
-      state.wait = true;
-      refresh();
-    }
-  }, 1000);
-
-  // --- 2: problems ---
   const input = document.getElementById("puzzleInput");
   const err = document.getElementById("puzzleErr");
   const checkBtn = document.getElementById("puzzleSubmitBtn");
-  let puzzle = generateHardPuzzle();
+  const reasonInput = document.getElementById("reasonInput");
+  const reasonErr = document.getElementById("reasonErr");
+  const waitFill = document.getElementById("waitFill");
+  const waitVal = document.getElementById("waitVal");
+  const stepEls = { wait: "stepWait", puzzle: "stepPuzzle", reason: "stepReason" };
+  let elapsed = 0;
   let streak = 0;
+  let puzzle = generateHardPuzzle();
 
-  function renderPuzzle() {
+  // Progress is kept as raw counts and judged against the current tier, so
+  // switching to a longer pass after starting raises the bar instead of
+  // resetting it, and switching down lets earlier effort count.
+  function refresh() {
+    const reason = validateOpenReason(reasonInput.value, tier.words);
+    const state = { wait: elapsed >= tier.wait, puzzle: streak >= tier.puzzles, reason: reason.valid };
+    const needsReason = tier.words > 0;
+    document.getElementById("stepReason").hidden = !needsReason;
+
+    document.getElementById("waitTitle").textContent = `Wait ${fmtDuration(tier.wait)}`;
+    waitVal.textContent = fmtCountdown(Math.max(tier.wait - elapsed, 0));
+    waitFill.style.width = `${Math.min(elapsed / tier.wait, 1) * 100}%`;
+    document.getElementById("puzzleTitle").textContent = tier.puzzles === 1 ? "Solve one problem" : `Solve ${tier.puzzles} in a row`;
     document.getElementById("puzzleQuestion").textContent = puzzle.question;
-    document.getElementById("puzzleProgress").innerHTML = Array.from({ length: RESTRAINT_PUZZLE_STREAK_REQUIRED })
+    document.getElementById("puzzleProgress").innerHTML = Array.from({ length: tier.puzzles })
       .map((_, i) => `<span class="gate-dot ${i < streak ? "gate-dot-filled" : ""}"></span>`)
       .join("");
-  }
-  renderPuzzle();
+    input.disabled = checkBtn.disabled = state.puzzle;
+    reasonInput.placeholder = `At least ${tier.words} words`;
+    reasonErr.hidden = reason.valid || !reasonInput.value;
+    reasonErr.textContent = reason.message;
 
+    const keys = needsReason ? Object.keys(state) : ["wait", "puzzle"];
+    let left = 0;
+    keys.forEach((key, i) => {
+      document.getElementById(stepEls[key]).classList.toggle("is-done", state[key]);
+      document.querySelector(`#${stepEls[key]} .bp-step-mark`).textContent = state[key] ? "✓" : String(i + 1);
+      if (!state[key]) left++;
+    });
+    gateCount.textContent = left ? `${left} step${left === 1 ? "" : "s"} left` : "Done";
+    gateCount.classList.toggle("is-done", !left);
+    continueBtn.disabled = left > 0;
+    continueBtn.textContent = left
+      ? "Complete the steps above"
+      : `Open ${displayName} ${pass.restOfDay ? "for the rest of today" : `for ${pass.label}`}`;
+  }
+
+  // --- 1: wait --- keeps counting past the current tier so a longer pass
+  // picked later is already partly paid for.
+  setInterval(() => {
+    elapsed++;
+    refresh();
+  }, 1000);
+
+  // --- 2: problems ---
   function checkPuzzle() {
     if (input.value.trim() === "") return;
     const correct = Number(input.value) === puzzle.answer;
     streak = correct ? streak + 1 : 0;
     err.hidden = correct;
-    if (streak >= RESTRAINT_PUZZLE_STREAK_REQUIRED) {
-      state.puzzle = true;
-      input.disabled = true;
-      checkBtn.disabled = true;
-      renderPuzzle();
-      refresh();
-      return;
-    }
     puzzle = generateHardPuzzle();
     input.value = "";
-    input.focus();
-    renderPuzzle();
+    refresh();
+    if (!input.disabled) input.focus();
   }
   checkBtn.addEventListener("click", checkPuzzle);
   input.addEventListener("keydown", (e) => {
@@ -334,20 +350,14 @@ function setupRestraintChallenge(site, destUrl) {
   });
 
   // --- 3: reason ---
-  const reasonInput = document.getElementById("reasonInput");
-  const reasonErr = document.getElementById("reasonErr");
-  reasonInput.addEventListener("input", () => {
-    const result = validateOpenReason(reasonInput.value);
-    state.reason = result.valid;
-    reasonErr.hidden = result.valid;
-    reasonErr.textContent = result.message;
-    refresh();
-  });
+  reasonInput.addEventListener("input", refresh);
+  refresh();
 
   continueBtn.addEventListener("click", async () => {
     if (continueBtn.disabled) return;
     continueBtn.disabled = true;
     continueBtn.textContent = "Opening…";
+    const passMinutes = passDurationMinutes(pass);
 
     let currentTabId = tabId;
     if (!currentTabId) {

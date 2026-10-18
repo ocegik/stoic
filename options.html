@@ -224,7 +224,7 @@
         <button class="btn-ghost" id="optCreateFirstBtn" type="button">Add a rule</button>
       </div>
 
-      <p class="rules-note">Tightening a rule is free. Loosening, suspending or deleting one costs the same sixty seconds as pushing through it.</p>
+      <p class="rules-note">Tightening a rule is free. Loosening, suspending or deleting one costs more the longer it lasts — deleting costs the most.</p>
 
       <section class="panel" id="ytPanel">
         <header class="panel-head">
@@ -435,7 +435,7 @@
         <div id="optModalRestraintRow" class="mt-3" hidden>
           <div class="callout">
             <div class="callout-label">Fixed, on purpose</div>
-            <div class="callout-text">The pause is always the same: sixty seconds that cannot be skipped, two hard problems solved back to back, and one written sentence. Loosening this rule later costs exactly the same — settings are never the easy way round.</div>
+            <div class="callout-text">The pause scales with what you ask for: a one-minute peek is a short wait and one problem; the rest of the day is a five-minute wait, four problems and a paragraph. Loosening or deleting this rule later costs the most of all — settings are never the easy way round.</div>
           </div>
         </div>
 
@@ -501,7 +501,7 @@
         <p class="fg-copy" id="fgCopy"></p>
 
         <div class="fg-step">
-          <div class="gate-step-label">1 · Wait sixty seconds</div>
+          <div class="gate-step-label" id="fgWaitLabel">1 · Wait</div>
           <div class="fg-wait-row">
             <div class="fg-wait-bar-bg"><div class="fg-wait-bar-fill" id="fgWaitBar"></div></div>
             <span class="fg-wait-val" id="fgWaitVal">60s</span>

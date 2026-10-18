@@ -156,8 +156,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Runs the full friction gate and resolves true only if the user makes
   // it through the wait, the puzzle streak, a genuine written reason, and
-  // an explicit final confirmation. Resolves false on cancel.
-  function requestFrictionGate({ title, copy }) {
+  // an explicit final confirmation. Resolves false on cancel. `minutes` is
+  // how long the loosening lasts and sets the tier (restraintTier);
+  // permanent changes leave it at Infinity, the hardest tier.
+  function requestFrictionGate({ title, copy, minutes = Infinity }) {
     return new Promise((resolve) => {
       if (!fgModal) {
         resolve(true);
@@ -172,10 +174,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       fgPuzzleErr.style.display = "none";
       fgConfirmBtn.disabled = true;
 
+      const tier = restraintTier(minutes);
+      document.getElementById("fgWaitLabel").textContent = `1 · Wait ${fmtDuration(tier.wait)}`;
+      document.getElementById("fgPuzzleGoal").textContent = tier.puzzles;
+      fgReasonInput.placeholder = `At least ${tier.words} words. Write a real, specific reason…`;
+
       const state = { waitDone: false, puzzleDone: false, reasonDone: false };
       let streak = 0;
       let currentPuzzle = generateHardPuzzle();
-      let remaining = RESTRAINT_WAIT_SECONDS;
+      let remaining = tier.wait;
       let waitTimer = null;
       let settled = false;
 
@@ -185,7 +192,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       function renderPuzzle() {
         fgPuzzleQuestion.textContent = currentPuzzle.question;
-        fgPuzzleProgress.innerHTML = Array.from({ length: RESTRAINT_PUZZLE_STREAK_REQUIRED })
+        fgPuzzleProgress.innerHTML = Array.from({ length: tier.puzzles })
           .map((_, i) => `<span class="gate-dot ${i < streak ? "gate-dot-filled" : ""}"></span>`)
           .join("");
       }
@@ -195,7 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (fgPuzzleInput.value.trim() !== "" && val === currentPuzzle.answer) {
           streak++;
           fgPuzzleErr.style.display = "none";
-          if (streak >= RESTRAINT_PUZZLE_STREAK_REQUIRED) {
+          if (streak >= tier.puzzles) {
             state.puzzleDone = true;
             fgPuzzleInput.disabled = true;
             renderPuzzle();
@@ -213,7 +220,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       function checkReason() {
-        const result = validateOpenReason(fgReasonInput.value);
+        const result = validateOpenReason(fgReasonInput.value, tier.words);
         state.reasonDone = result.valid;
         fgReasonErr.style.display = result.valid ? "none" : "block";
         fgReasonErr.textContent = result.message;
@@ -222,8 +229,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       function tickWait() {
         remaining--;
-        fgWaitVal.textContent = `${Math.max(0, remaining)}s`;
-        fgWaitBar.style.width = `${Math.round(((RESTRAINT_WAIT_SECONDS - remaining) / RESTRAINT_WAIT_SECONDS) * 100)}%`;
+        fgWaitVal.textContent = fmtCountdown(remaining);
+        fgWaitBar.style.width = `${Math.round(((tier.wait - remaining) / tier.wait) * 100)}%`;
         if (remaining <= 0) {
           clearInterval(waitTimer);
           state.waitDone = true;
@@ -265,7 +272,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
 
-      fgWaitVal.textContent = `${remaining}s`;
+      fgWaitVal.textContent = fmtCountdown(remaining);
       fgWaitBar.style.width = "0%";
       renderPuzzle();
       fgPuzzleInput.disabled = false;
@@ -1250,6 +1257,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           const proceed = await requestFrictionGate({
             title: `Suspend ${displayName} for ${option.label.toLowerCase()}?`,
             copy: "While it's suspended this rule does nothing, exactly as if you'd deleted it. It comes back on its own when the time is up.",
+            minutes: option.minutes || 24 * 60,
           });
           if (!proceed) return;
           suspendRule(entry, option.id);

@@ -156,3 +156,16 @@ test("REFLECTION_QUESTIONS: provides a non-empty collection of mindful reflectio
     assert.ok(q.length > 10);
   });
 });
+
+test("restraintTier: longer escapes cost strictly more", () => {
+  const { restraintTier } = require("../common.js");
+  const tiers = [1, 5, 15, 60, 24 * 60, Infinity].map(restraintTier);
+  for (let i = 1; i < tiers.length; i++) {
+    assert.ok(tiers[i].wait > tiers[i - 1].wait);
+    assert.ok(tiers[i].words > tiers[i - 1].words);
+    assert.ok(tiers[i].puzzles >= tiers[i - 1].puzzles);
+  }
+  assert.equal(restraintTier(30), restraintTier(60));
+  assert.equal(restraintTier(15).wait, RESTRAINT_WAIT_SECONDS);
+  assert.equal(validateOpenReason("", restraintTier(1).words).valid, true);
+});
