@@ -1124,10 +1124,62 @@
     return archived ? archived.youtube : null;
   }
 
+  // ---- Period attribution ----
+  // Per-video classification guessed wrong too often, so tracking now books
+  // YouTube time to the local hour it happened in ("p:HH"). Once the hour is
+  // over the key is closed as "p:HH:Leisure" and, if it was long enough, the
+  // user is asked what it was; an answer rewrites it to "p:HH:<macro>".
+  // Silence leaves it as Leisure. Old "v:"/"c:" keys in history still resolve.
+  const PERIOD_DEFAULT_MACRO = "Leisure";
+
+  function periodKeyFor(date = new Date()) {
+    return `p:${String(date.getHours()).padStart(2, "0")}`;
+  }
+
+  // Closes every open period in `map` except `openKey` (the hour still in
+  // progress; pass null once the day is over). Returns the closed periods,
+  // as [{ hour: "HH", seconds }], for the caller to ask about.
+  function closeYouTubePeriods(map, openKey) {
+    const closed = [];
+    if (!map) return closed;
+    Object.keys(map).forEach((key) => {
+      if (!/^p:\d\d$/.test(key) || key === openKey) return;
+      const seconds = Number(map[key]) || 0;
+      delete map[key];
+      const label = `${key}:${PERIOD_DEFAULT_MACRO}`;
+      map[label] = (map[label] || 0) + seconds;
+      closed.push({ hour: key.slice(2), seconds });
+    });
+    return closed;
+  }
+
+  // The user's answer for one closed period. Returns false when there was
+  // nothing to relabel (already answered differently is fine — last wins).
+  function labelYouTubePeriod(map, hour, macro) {
+    if (!map || !DEFAULT_MICRO[macro]) return false;
+    const from = Object.keys(map).find((k) => k.startsWith(`p:${hour}:`));
+    if (!from) return false;
+    const seconds = map[from];
+    delete map[from];
+    map[`p:${hour}:${macro}`] = seconds;
+    return true;
+  }
+
   // Resolves one attribution key back to a category, using exactly the same
   // precedence chain live classification uses.
   function classificationForKey(key, options) {
     if (!key || key === BROWSE_KEY) return null;
+    if (key.startsWith("p:")) {
+      const [, hour, label] = key.split(":");
+      const macro = DEFAULT_MICRO[label] ? label : PERIOD_DEFAULT_MACRO;
+      return new Result({
+        macro,
+        micro: DEFAULT_MICRO[macro],
+        confidence: 1.0,
+        source: "period",
+        metadata: { hour, answered: !!label && label !== PERIOD_DEFAULT_MACRO },
+      });
+    }
     if (key.startsWith("v:")) {
       const videoId = key.slice(2);
       const video = (options.videoDb || getVideoDatabaseSync())[videoId] || null;
@@ -1319,6 +1371,13 @@
         return `Counted as ${label} because ${who ? `"${who}"` : "this channel"} was predicted to be ${result.micro} — nothing you set by hand.`;
       case "predicted_video":
         return `Counted as ${label} based on this video's own title — its channel hasn't been classified yet.`;
+      case "period": {
+        const h = Number(result.metadata.hour);
+        const span = `${String(h).padStart(2, "0")}:00–${String((h + 1) % 24).padStart(2, "0")}:00`;
+        return result.metadata.answered
+          ? `Counted as ${label} because you said ${span} was ${label}.`
+          : `Counted as ${label} because nobody said otherwise for ${span} — unanswered periods default to Leisure.`;
+      }
       case "user_override":
         return `Counted as ${label} because you set ${match.domain}'s default category to ${result.micro}.`;
       default:
@@ -1492,6 +1551,9 @@
     // attribution
     attributionKeyForContext,
     creditYouTubeSeconds,
+    periodKeyFor,
+    closeYouTubePeriods,
+    labelYouTubePeriod,
     attributionMapFor,
     classificationForKey,
     resolveYouTubeSegments,

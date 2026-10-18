@@ -234,15 +234,13 @@ async function tick() {
 
   // Single place that credits elapsed time, so the plain counter and the
   // per-content attribution can never diverge. For YouTube the seconds are
-  // additionally booked against the video (or channel) actually on screen;
-  // the category is resolved later, at read time, which is what lets a
-  // re-classification retroactively correct today's analytics.
+  // additionally booked against the current hour; the user labels that hour
+  // once it's over (see closeYouTubePeriodsTask), defaulting to Leisure.
   const creditUsage = (seconds) => {
     if (!(seconds > 0)) return;
     entry.usedSeconds = (entry.usedSeconds || 0) + seconds;
     if (isYouTubeDomain(current.domain)) {
-      const meta = latestYouTubeMetadataByTab[current.tabId] || null;
-      creditYouTubeSeconds(entry, attributionKeyForContext(meta), seconds, todayStr());
+      creditYouTubeSeconds(entry, periodKeyFor(new Date(now)), seconds, todayStr());
     }
   };
 
@@ -313,8 +311,6 @@ async function tick() {
 // race to write it back, silently dropping one of the updates (e.g.
 // undercounting usedSeconds, or missing a trip). createCoalescingRunner
 // (background-logic.js) makes sure at most one tick runs at a time.
-let latestYouTubeMetadataByTab = {};
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GRANT_RESTRAINT_PASS") {
     const tabId = message.tabId || sender.tab?.id;
@@ -361,7 +357,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "YOUTUBE_METADATA_UPDATE") {
     const tabId = sender.tab?.id || activeState.tabId;
     if (tabId && message.metadata) {
-      latestYouTubeMetadataByTab[tabId] = message.metadata;
       recordYouTubeVisit(message.metadata)
         .then(() => runTick())
         .catch((err) => console.error("[Stoic] recordYouTubeVisit failed", err));
@@ -372,7 +367,87 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 });
 
-const runTick = createCoalescingRunner(tick, (err) => console.error("[Stoic] tick failed", err));
+// ---------- YouTube periods ----------
+// Ask about an hour only if it had at least this much YouTube; shorter ones
+// quietly stay Leisure.
+const PERIOD_ASK_MIN_SECONDS = 10 * 60;
+const PERIOD_NOTIF_PREFIX = "stoic-ytp|";
+const PERIOD_BUTTON_MACROS = ["Productivity", "General"];
+const pendingPeriodAnswers = [];
+let lastPeriodPassKey = null; // in-memory: a worker restart just costs one extra pass
+
+function hourSpan(hour) {
+  const h = Number(hour);
+  return `${String(h).padStart(2, "0")}:00–${String((h + 1) % 24).padStart(2, "0")}:00`;
+}
+
+// Runs inside the same coalesced runner as tick(), so its read-modify-write
+// of `sites` can never interleave with a tick's.
+async function closeYouTubePeriodsTask() {
+  const today = todayStr();
+  const openKey = periodKeyFor(new Date());
+  if (!pendingPeriodAnswers.length && lastPeriodPassKey === today + openKey) return;
+  lastPeriodPassKey = today + openKey;
+  const sites = await getSites();
+  let changed = false;
+
+  while (pendingPeriodAnswers.length) {
+    const { domain, date, hour, macro } = pendingPeriodAnswers.shift();
+    const entry = sites[domain];
+    if (entry && labelYouTubePeriod(attributionMapFor(entry, date), hour, macro)) changed = true;
+  }
+
+  const asks = [];
+  Object.keys(sites).forEach((domain) => {
+    if (!isYouTubeDomain(domain)) return;
+    const entry = sites[domain];
+    const yt = entry.youtube;
+    if (yt && yt.keys) {
+      closeYouTubePeriods(yt.keys, yt.date === today ? openKey : null).forEach((p) => asks.push({ domain, date: yt.date, ...p }));
+    }
+    // A day that rolled over mid-hour archived its still-open period.
+    const history = entry.history || [];
+    const last = history[history.length - 1];
+    if (last && last.youtube) {
+      closeYouTubePeriods(last.youtube, null).forEach((p) => asks.push({ domain, date: last.date, ...p }));
+    }
+  });
+  if (asks.length) changed = true;
+  if (changed) await saveSites(sites);
+
+  for (const a of asks) {
+    if (a.seconds < PERIOD_ASK_MIN_SECONDS) continue;
+    try {
+      await chrome.notifications.create(`${PERIOD_NOTIF_PREFIX}${a.domain}|${a.date}|${a.hour}`, {
+        type: "basic",
+        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+        title: `${Math.round(a.seconds / 60)} min of YouTube, ${hourSpan(a.hour)}`,
+        message: "What was it? Ignore this and it counts as Leisure.",
+        buttons: PERIOD_BUTTON_MACROS.map((m) => ({ title: MACRO_CATEGORIES[m].label })),
+        requireInteraction: true,
+        priority: 1,
+      });
+    } catch (err) {
+      console.error("[Stoic] period notification failed", err);
+    }
+  }
+}
+
+chrome.notifications.onButtonClicked.addListener((id, buttonIndex) => {
+  if (!id.startsWith(PERIOD_NOTIF_PREFIX)) return;
+  const [domain, date, hour] = id.slice(PERIOD_NOTIF_PREFIX.length).split("|");
+  pendingPeriodAnswers.push({ domain, date, hour, macro: PERIOD_BUTTON_MACROS[buttonIndex] });
+  chrome.notifications.clear(id);
+  runTick();
+});
+
+const runTick = createCoalescingRunner(
+  async () => {
+    await tick();
+    await closeYouTubePeriodsTask();
+  },
+  (err) => console.error("[Stoic] tick failed", err)
+);
 // Same coalescing guard as tick(): settlement is triggered from several
 // independent sources (a day rollover mid-tick, the periodic alarm, an
 // explicit REQUEST_SETTLEMENT message, worker startup) and must never run
@@ -391,17 +466,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.tabs.onActivated.addListener(() => runTick());
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (!changeInfo.url) return;
-  // A tab that has left YouTube must stop carrying its last video's
-  // metadata around, or the next tick would keep attributing time to a
-  // video that is no longer on screen (and the map would grow forever).
-  if (!isYouTubeDomain(getDomain(changeInfo.url) || "")) {
-    delete latestYouTubeMetadataByTab[tabId];
-  }
   runTick();
 });
 chrome.tabs.onRemoved.addListener((tabId) => {
   removeRestraintPassForTab(tabId);
-  delete latestYouTubeMetadataByTab[tabId];
 });
 chrome.windows.onFocusChanged.addListener(() => runTick());
 chrome.idle.onStateChanged.addListener(() => runTick());
